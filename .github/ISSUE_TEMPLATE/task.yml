@@ -1,0 +1,18 @@
+# SPDX-FileCopyrightText: 2026 Junctura Contributors
+# SPDX-License-Identifier: Apache-2.0
+name: Công việc / Task
+description: Một phần việc có thể kiểm tra và duyệt riêng
+title: "feat: "
+body:
+  - type: textarea
+    id: objective
+    attributes:
+      label: Mục tiêu và phạm vi
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Điều kiện hoàn thành và kiểm thử
+    validations:
+      required: true
