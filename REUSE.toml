@@ -1,0 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Junctura Contributors
+# SPDX-License-Identifier: Apache-2.0
+version = 1
+[[annotations]]
+path = ["NOTICE", ".node-version", "**/*.json"]
+SPDX-FileCopyrightText = "2026 Junctura Contributors"
+SPDX-License-Identifier = "Apache-2.0"
