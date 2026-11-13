@@ -4,7 +4,7 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** bản khởi tạo (Issue #2). Có trang giới thiệu, đăng nhập Junctura và khung làm việc cho bác sĩ. Hàng đợi, tiếp nhận, khám, cấp cứu, đơn thuốc, chi phí và nhật ký mới là khu vực điều hướng, chưa xử lý hồ sơ. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập Junctura, phân quyền bác sĩ và tra cứu phiếu chuyển tuyến qua Core (Issue #4). Chưa xác nhận tiếp nhận vào hàng đợi/BPMN, khám, kê đơn hoặc xử lý cấp cứu. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
@@ -59,12 +59,35 @@ Biến môi trường ưu tiên hơn file env của Health. `.env` tại Hospita
 - GET /health: tiến trình Hospital đang chạy (không phải kiểm tra readiness của Core).
 - GET /api/config: chỉ issuer, client web, tên sản phẩm và cơ sở.
 - GET /api/me: danh tính bác sĩ đã xác minh; yêu cầu Bearer token.
+- POST /api/referrals/lookup: tra cứu qua Core; body JSON chỉ có `patientSubject` (Keycloak sub dạng UUID) và `referralId`, yêu cầu tài khoản physician. Không gửi mã qua URL.
 
-Chưa có API ghi hồ sơ, gọi năng lực hoặc provider. Chưa thêm database, workflow hay audit riêng.
+Chưa có API ghi hồ sơ hoặc provider. Chưa thêm database, workflow hay audit riêng. Core tự kiểm tra đồng thuận và ghi audit trao đổi; Hospital không tự thay thế các cơ chế này.
 
-## Năng lực dự kiến
+## Tra cứu chuyển tuyến
 
-Hospital sẽ gọi `referral-summary`, `pre-visit-summary`, `allergy-list`, `vaccination-history`; cung cấp `prescription-verify` và `claim-verify`. Hợp đồng lấy từ @junctura/health-contracts; chưa triển khai trong Issue #2. Không gọi thẳng ứng dụng khác.
+Vào **Tiếp nhận**, nhập mã định danh Junctura do người bệnh cung cấp và mã phiếu của Clinic. Hospital dùng SDK để tìm đúng manifest từ Health, gửi `{ referralId }` và context `{ purpose: "referral_intake", dataSubject: patientSubject }`, rồi kiểm tra kết quả trước khi hiển thị. Không gọi thẳng Clinic.
+
+Phiếu không chứa họ tên, năm sinh, giới hoặc dị ứng: giao diện ghi rõ chưa biết/không xem được, không tự lấy thêm dữ liệu từ Clinic. Ngày hiển thị là ngày phát hành, không phải ngày cập nhật hồ sơ. Mọi lần sửa mã hoặc đổi tab đều xóa kết quả đang xem; đóng trình duyệt không lưu phiếu.
+
+Thiếu đồng thuận có thông báo riêng: người bệnh cần cấp quyền cho Hospital, năng lực referral-summary và mục đích referral_intake qua MyHealth/API chủ dữ liệu. Không có đường cấp cứu cho năng lực này. Core hiện gom các HTTP lỗi của provider thành provider_failed, nên Hospital không khẳng định phiếu không tồn tại khi chỉ nhận lỗi này.
+
+### Điều kiện chạy liên thông local
+
+1. Core và Health demo đã được chuẩn bị. Hospital tự đọc `JUNCTURA_URL`, backend client/secret từ env riêng; không đưa secret ra web.
+2. ID ứng dụng Clinic lấy từ file demo `junctura-clinic.env` (chỉ dùng JUNCTURA_APP_ID), hoặc đặt `JUNCTURA_REFERRAL_PROVIDER_APP_ID` rõ ràng.
+3. Bật C4A bằng cơ chế sẵn có của Core: `npm run provider:pki -- clinic`, cấu hình `C4A_ENABLED=true`, allowlist `https://clinic.provider.internal:8443`, khởi động Core cùng `compose.providers.yaml`. Xem docs/CAPABILITY_EXECUTION.md của Core.
+4. Clinic phải cung cấp HTTPS trên origin đó, cùng mạng providers và chứng chỉ đúng CA. Chạy UI Clinic đơn thuần chưa đủ.
+5. Người bệnh có đồng thuận còn hiệu lực; grant Hospital → Clinic do Health demo:setup tạo còn hiệu lực.
+
+Chỉ cấu hình local thay đổi; không sửa mã Core hoặc hợp đồng Health. C4B không cần bật. Khi đổi env, khởi động lại Hospital.
+
+### Kiểm thử end-to-end có chủ đích
+
+`npm run test:referrals:live` dùng Core local, tài khoản giả lập An và phiếu CT-2026-000123. Cần chưa có đồng thuận đang hiệu lực của An cho năng lực này. Script dùng helper PKCE của Core, kiểm tra từ chối trước đồng thuận, cấp đồng thuận tạm, lấy phiếu qua provider TLS thật, kiểm tra lỗi phiếu và thu hồi chính đồng thuận vừa tạo trong finally; sau đó xác nhận bị chặn trở lại. Không chạy trên hệ thống thật. Script không khởi động provider hoặc đổi cấu hình Core giúp bạn.
+
+## Năng lực còn lại
+
+Đã gọi `referral-summary`; các năng lực `pre-visit-summary`, `allergy-list`, `vaccination-history`, `prescription-verify` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
 
 ## Kiểm thử và giấy phép
 

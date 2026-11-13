@@ -4,10 +4,10 @@ import { LandingPage, PreviewFrame, Badge } from "@junctura/health-ui";
 import { ClipboardList, ShieldCheck, Stethoscope } from "lucide-react";
 
 export function Landing({ onSignIn }: { onSignIn: () => void }) {
-  return <LandingPage product="Hospital" badge="Bệnh viện · Bản khởi tạo"
+  return <LandingPage product="Hospital" badge="Bệnh viện · Bản demo"
     headline="Kết nối thông tin, tiếp nối chăm sóc"
     lead="Không gian làm việc dành cho bác sĩ và nhân viên tiếp nhận trong hệ sinh thái Junctura Health."
-    note="Bản này có đăng nhập và khung làm việc. Các chức năng nghiệp vụ đang được xây dựng; chỉ dùng dữ liệu giả lập."
+    note="Đã có đăng nhập và tra cứu phiếu chuyển tuyến qua Junctura. Các luồng khám, kê đơn và cấp cứu đang được xây dựng; chỉ dùng dữ liệu giả lập."
     onSignIn={onSignIn}
     hero={<PreviewFrame label="Các bước dự kiến của Hospital" title="Hospital · Hướng phát triển">
       <div className="space-y-4"><Badge>Đang xây dựng</Badge>
@@ -15,7 +15,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
         <p className="text-sm text-ink-2">Dữ liệu từ trạm y tế được trao đổi qua Junctura theo quyền và đồng thuận.</p>
       </div></PreviewFrame>}
     benefits={{ title: "Hướng tới một ca khám có đủ thông tin", items: [
-      { icon: <ClipboardList className="size-5" />, title: "Tiếp nhận có nguồn", text: "Luồng chuyển tuyến sẽ hiển thị nguồn và thời điểm của hồ sơ nhận từ trạm." },
+      { icon: <ClipboardList className="size-5" />, title: "Tiếp nhận có nguồn", text: "Tra cứu phiếu chuyển tuyến, hiển thị nguồn và ngày phát hành của hồ sơ nhận từ trạm." },
       { icon: <Stethoscope className="size-5" />, title: "Thấy rõ trạng thái dị ứng", text: "Phân biệt dữ liệu chưa ghi nhận, không xem được và dị ứng đã xác nhận." },
       { icon: <ShieldCheck className="size-5" />, title: "Trao đổi có kiểm soát", text: "Định danh, đồng thuận và nhật ký trao đổi do Junctura DX-OS cung cấp." },
     ] }}
@@ -34,7 +34,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
       { title: "Mã nguồn mở", text: "Apache-2.0; đóng góp qua Issue và Pull Request." },
     ] }}
     faq={{ title: "Trước khi bắt đầu", items: [
-      { q: "Bản này đã dùng để khám bệnh chưa?", a: "Chưa. Đây là bản khởi tạo, chỉ có đăng nhập và khung làm việc." },
+      { q: "Bản này đã dùng để khám bệnh chưa?", a: "Chưa. Bản demo có đăng nhập và tra cứu phiếu; chưa xử lý khám bệnh hay xác nhận tiếp nhận." },
       { q: "Ai có thể đăng nhập?", a: "Tài khoản physician thuộc Hospital trong môi trường Health demo đã cấu hình." },
     ] }}
     cta={{ title: "Mở không gian Hospital", lead: "Dùng tài khoản Junctura được cấp cho bệnh viện." }}
