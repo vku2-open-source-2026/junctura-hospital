@@ -20,7 +20,14 @@ export function loadConfig({ env = process.env, cwd = process.cwd() } = {}) {
   }
   const port = Number(get("PORT") ?? get("WEB_PORT") ?? 5182);
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error("PORT must be a valid port number.");
-  return Object.freeze({ issuer, webClientId, port, host: get("HOST") ?? "127.0.0.1",
+  const baseUrl = get("JUNCTURA_URL"), clientId = get("JUNCTURA_APP_CLIENT_ID"), clientSecret = get("JUNCTURA_APP_CLIENT_SECRET");
+  const clinicEnv = resolve(healthDir, ".junctura/demo/junctura-clinic.env");
+  const providerAppId = get("JUNCTURA_REFERRAL_PROVIDER_APP_ID") ??
+    (existsSync(clinicEnv) ? parseEnv(readFileSync(clinicEnv, "utf8")).JUNCTURA_APP_ID : undefined);
+  return Object.freeze({
+    junctura: baseUrl && clientId && clientSecret ? Object.freeze({ baseUrl, clientId, clientSecret }) : null,
+    referralProviderAppId: providerAppId,
+    issuer, webClientId, port, host: get("HOST") ?? "127.0.0.1",
     issuerInternal: (get("JUNCTURA_ISSUER_INTERNAL") ?? issuer).replace(/\/+$/, ""),
     accountsFile: resolve(healthDir, "seed/data/accounts.json"),
     subjectsFile: resolve(healthDir, ".junctura/demo/subjects.json"),
