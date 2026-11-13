@@ -14,7 +14,7 @@ it("uses the common landing and clearly labels the bootstrap scope", () => {
   const signIn = vi.fn();
   render(<DisplayPrefsProvider><Landing onSignIn={signIn} /></DisplayPrefsProvider>);
   expect(screen.getByRole("heading", { level: 1 }).textContent).toContain("Kết nối thông tin");
-  expect(screen.getByText(/Bản này có đăng nhập và khung làm việc/)).toBeTruthy();
+  expect(screen.getByText(/Đã có đăng nhập và tra cứu phiếu/)).toBeTruthy();
   fireEvent.click(screen.getAllByRole("button", { name: "Đăng nhập" })[0]);
   expect(signIn).toHaveBeenCalledOnce();
 });

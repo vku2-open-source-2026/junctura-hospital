@@ -23,7 +23,7 @@ async function fixture(t, options = {}) {
   writeFileSync(join(dir, "index.html"), "<html lang='vi'>Hospital shell</html>");
   const config = { issuer: ISSUER, webClientId: CLIENT, facility: "Bệnh viện thử nghiệm", staticDir: dir, clientSecret: "never-public" };
   const verifier = options.verifier ?? createVerifier({ issuer: ISSUER, clientId: CLIENT, getJson: async () => ({ keys: [signer.jwk] }) });
-  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier }));
+  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral }));
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -78,4 +78,23 @@ test("maps seeded staff subjects to actual Keycloak subjects", () => {
   assert.equal(staff.has("doctor-subject"), false);
   assert.equal(staff.get("actual-subject").username, "bacsi.benhvien");
   assert.equal(staff.size, 1);
+});
+
+test("lookup API authenticates before Core and requires bounded JSON POST", async t => {
+  let calls = 0;
+  const { request } = await fixture(t, { lookupReferral: async body => { calls++; return { requested: body.referralId }; } });
+  const init = { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ patientSubject: "subject", referralId: "CT-TEST" }) };
+  assert.equal((await request("/api/referrals/lookup", null, init)).status, 401);
+  assert.equal((await request("/api/referrals/lookup", { sub: "insurance-subject", preferred_username: "giamdinh.baohiem" }, init)).status, 403);
+  assert.equal(calls, 0);
+  assert.equal((await request("/api/referrals/lookup", {})).status, 405);
+  assert.equal((await request("/api/referrals/lookup?patient=private", {}, init)).status, 400);
+  assert.equal((await request("/api/referrals/lookup", {}, { ...init, body: "{" })).status, 400);
+  assert.equal((await request("/api/referrals/lookup", {}, { ...init, headers: { "content-type": "text/plain" } })).status, 415);
+  assert.equal((await request("/api/referrals/lookup", {}, { ...init, body: "x".repeat(2049) })).status, 413);
+  const response = await request("/api/referrals/lookup", {}, init);
+  assert.equal(response.status, 200);
+  assert.equal(response.headers.get("cache-control"), "no-store");
+  assert.deepEqual(await response.json(), { requested: "CT-TEST" });
+  assert.equal(calls, 1);
 });

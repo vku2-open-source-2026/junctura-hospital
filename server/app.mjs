@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createReadStream, existsSync, statSync } from "node:fs";
 import { extname, resolve, sep } from "node:path";
+import { ReferralError } from "./referrals.mjs";
 import { AuthError } from "./jwt.mjs";
 import { staffIdentity } from "./staff.mjs";
 
@@ -9,7 +10,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
   ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff" };
 
 // Thin application boundary adapted from Clinic. Identity stays in Junctura.
-export function createApp({ config, staff, verifier }) {
+export function createApp({ config, staff, verifier, lookupReferral }) {
   const headers = { "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
     "x-frame-options": "DENY", "cache-control": "no-store",
     "content-security-policy": `default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' ${new URL(config.issuer).origin}; img-src 'self' data:; style-src 'self' 'unsafe-inline'` };
@@ -31,6 +32,29 @@ export function createApp({ config, staff, verifier }) {
         const claims = await verifier(token[1]);
         const user = staffIdentity(staff, claims);
         if (!user) return send(403, { error: "forbidden" });
+        if (path === "/api/referrals/lookup") {
+          if (req.method !== "POST") return send(405, { error: "method_not_allowed" });
+          if (url.search) return send(400, { error: "invalid_lookup" });
+          if (!/^application\/json(;|$)/i.test(req.headers["content-type"] ?? "")) return send(415, { error: "json_required" });
+          let bytes = 0; const chunks = [];
+          for await (const chunk of req) {
+            bytes += chunk.length;
+            if (bytes > 2048) return send(413, { error: "payload_too_large" });
+            chunks.push(chunk);
+          }
+          let body;
+          try { body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); }
+          catch { return send(400, { error: "invalid_json" }); }
+          if (!lookupReferral) throw new ReferralError(503, "referrals_not_configured");
+          const cancellation = new AbortController();
+          const disconnect = () => cancellation.abort();
+          res.once("close", disconnect);
+          try {
+            const result = await lookupReferral(body, cancellation.signal);
+            if (!res.destroyed) return send(200, result);
+            return;
+          } finally { res.off("close", disconnect); }
+        }
         if (path !== "/api/me") return send(404, { error: "not_found" });
         if (req.method !== "GET") return send(405, { error: "method_not_allowed" });
         return send(200, { ...user, permissions: ["workspace.read"] });
@@ -52,6 +76,8 @@ export function createApp({ config, staff, verifier }) {
       if (req.method === "HEAD") return res.end();
       createReadStream(file).on("error", () => res.destroy()).pipe(res);
     } catch (error) {
+      if (res.destroyed) return;
+      if (error instanceof ReferralError) return send(error.status, { error: error.code });
       if (error instanceof AuthError) return send(401, { error: "sign_in_required" });
       return send(503, { error: "identity_unavailable" });
     }

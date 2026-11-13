@@ -5,6 +5,8 @@ import { ClipboardList, FileInput, Pill, Receipt, ScrollText, ShieldAlert, Steth
 import { useEffect, useState } from "react";
 import { ApiError, getConfig, getMe, type Config, type Me } from "./api";
 import { buildLogoutUrl, clearSession, completeLogin, loadSession, startLogin } from "./auth";
+import { Intake } from "./Intake";
+import type { OidcSettings } from "./auth";
 import { Landing } from "./Landing";
 
 const pages = [
@@ -39,16 +41,16 @@ async function loadApplication() {
     throw error;
   }
 }
-export function Workspace({ me, facility, onSignOut }: { me: Me; facility: string; onSignOut: () => void }) {
+export function Workspace({ me, facility, onSignOut, settings }: { me: Me; facility: string; onSignOut: () => void; settings?: OidcSettings }) {
   const [current, setCurrent] = useState("queue");
   const page = pages.find(item => item.id === current)!;
   return <AppShell product="Hospital" nav={nav} current={current} onNavigate={setCurrent}
     unit={{ name: facility }} user={{ name: me.displayName, role: "Bác sĩ", unit: facility }} onSignOut={onSignOut}
-    status={<Badge>Bản khởi tạo</Badge>}>
-    <PageHeader title={page.label} description={page.description} badges={<Badge>Chưa triển khai</Badge>} />
-    <EmptyState title="Chức năng đang được xây dựng">
-      Bản khởi tạo chưa xử lý hồ sơ người bệnh. Vui lòng dùng phiên bản đã được đơn vị xác nhận khi tính năng hoàn tất.
-    </EmptyState>
+    status={<Badge>Demo · dữ liệu giả lập</Badge>}>
+    <PageHeader title={page.label} description={page.description} badges={current === "intake" ? <Badge>Tra cứu qua Junctura</Badge> : <Badge>Chưa triển khai</Badge>} />
+    {current === "intake" && settings ? <Intake settings={settings} /> : <EmptyState title="Chức năng đang được xây dựng">
+      Khu vực này chưa xử lý hồ sơ người bệnh. Vui lòng dùng phiên bản đã được đơn vị xác nhận khi tính năng hoàn tất.
+    </EmptyState>}
   </AppShell>;
 }
 export function App() {
@@ -72,7 +74,7 @@ export function App() {
   if (state.kind === "loading") return <main className="mx-auto max-w-3xl p-6"><Skeleton lines={5} /></main>;
   if (state.kind === "error") return <main className="p-6"><ErrorState title="Không kết nối được Hospital" onRetry={retry}>Kiểm tra máy chủ ứng dụng và kết nối Junctura, sau đó thử lại.</ErrorState></main>;
   if (state.kind === "forbidden") return <main className="space-y-4 p-6"><PermissionState title="Bạn chưa có quyền vào Hospital">Liên hệ quản trị viên để kiểm tra tài khoản bác sĩ của bệnh viện.</PermissionState><div className="text-center"><Button onClick={signOut}>Đăng xuất để đổi tài khoản</Button></div></main>;
-  if (state.kind === "ready" && config) return <Workspace me={state.me} facility={config.facility} onSignOut={signOut} />;
+  if (state.kind === "ready" && config) return <Workspace me={state.me} facility={config.facility} onSignOut={signOut} settings={config} />;
   if (!signInPage) return <Landing onSignIn={() => setSignInPage(true)} />;
   return <SignInPage product="Hospital" subtitle="Dành cho bác sĩ của bệnh viện" message={state.kind === "signed-out" ? state.message : undefined}
     note="Mật khẩu chỉ nhập trên trang Junctura." onSignIn={signIn} onBack={() => setSignInPage(false)} />;
