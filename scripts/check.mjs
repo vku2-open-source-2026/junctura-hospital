@@ -7,7 +7,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { basename } from "node:path";
 
-const COMMENTABLE = /\.(mjs|cjs|js|jsx|ts|tsx|css|html|svg|md|ya?ml|toml|sh|ps1|sql|conf)$/;
+const COMMENTABLE = /\.(mjs|cjs|js|jsx|ts|tsx|css|html|svg|md|ya?ml|toml|sh|ps1|sql|conf|xml)$/;
 const NAMED = new Set([".gitignore", ".gitattributes", ".editorconfig", ".dockerignore", "Dockerfile"]);
 const EXEMPT = /^(LICENSE|LICENSES\/)/;
 

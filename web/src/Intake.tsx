@@ -1,21 +1,27 @@
 // SPDX-FileCopyrightText: 2026 Junctura Contributors
 // SPDX-License-Identifier: Apache-2.0
-import { AlertBanner, Badge, Button, EmptyState, ErrorState, PatientBanner, PermissionState, Section, Skeleton, SourceBadge, TextField, formatDateTime } from "@junctura/health-ui";
+import { AlertBanner, Badge, Button, EmptyState, PatientBanner, Section, Skeleton, SourceBadge, TextField, formatDateTime } from "@junctura/health-ui";
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ApiError, lookupReferral, type ReferralResult } from "./api";
+import { ReferralFailure } from "./ReferralFailure";
+import { AdmissionForm } from "./Admissions";
+import { ApiError, lookupReferral, getDemoCases, type DemoCase, type ReferralResult } from "./api";
 import type { OidcSettings } from "./auth";
 
 type State = { kind: "idle" } | { kind: "loading"; patientSubject: string } | { kind: "success"; value: ReferralResult } | { kind: "error"; code: string; patientSubject: string };
 const urgency = { routine: "Thông thường", urgent: "Khẩn", emergency: "Cấp cứu" };
-export function Intake({ settings }: { settings: OidcSettings }) {
+export function Intake({ settings, demoEnabled = false, onShowQueue = () => {} }: { settings: OidcSettings; demoEnabled?: boolean; onShowQueue?: () => void }) {
   const [patientSubject, setPatientSubject] = useState("");
   const [referralId, setReferralId] = useState("");
   const [state, setState] = useState<State>({ kind: "idle" });
   const [validation, setValidation] = useState(false);
+  const [examples, setExamples] = useState<DemoCase[]>([]);
+  const [suggested, setSuggested] = useState<DemoCase | null>(null);
+  const [demoError, setDemoError] = useState(false);
+  useEffect(() => { const controller = new AbortController(); if (demoEnabled) getDemoCases(settings, controller.signal).then(value => { if (!controller.signal.aborted) setExamples(value.items); }).catch(() => { if (!controller.signal.aborted) setDemoError(true); }); return () => controller.abort(); }, [demoEnabled, settings.issuer, settings.clientId]);
   const pending = useRef<AbortController | null>(null);
   const generation = useRef(0);
   useEffect(() => () => { generation.current++; pending.current?.abort(); }, []);
-  const invalidate = () => { generation.current++; pending.current?.abort(); setState({ kind: "idle" }); setValidation(false); };
+  const invalidate = () => { generation.current++; pending.current?.abort(); setState({ kind: "idle" }); setValidation(false); setSuggested(null); };
   async function submit(event: FormEvent) {
     event.preventDefault();
     const subject = patientSubject.trim().toLowerCase();
@@ -41,6 +47,10 @@ export function Intake({ settings }: { settings: OidcSettings }) {
         extra={<><span>Năm sinh: Chưa rõ</span><span>Giới: Chưa rõ</span></>} />
     </>}
 
+    {demoEnabled && <Section title="Thử bằng dữ liệu giả lập" description="Chọn tình huống để điền mã mẫu, sau đó bấm Tra cứu phiếu. Việc chọn mẫu không cấp quyền truy cập.">
+      <div className="flex flex-wrap gap-2">{examples.map(item => <Button key={item.patientSubject} variant="secondary" onClick={() => { invalidate(); setSuggested(item); setPatientSubject(item.patientSubject); setReferralId(item.referralId); }}>{item.label}</Button>)}</div>
+      {demoError && <p className="text-sm text-muted">Chưa tải được ca mẫu. Kiểm tra đăng nhập và chuẩn bị demo trước.</p>}
+    </Section>}
     <Section title="Tra cứu phiếu chuyển tuyến" description="Dùng mã định danh Junctura do người bệnh cung cấp cùng mã phiếu của trạm y tế.">
       <form onSubmit={submit} className="space-y-4">
         <div className="grid gap-4 lg:grid-cols-2">
@@ -56,23 +66,9 @@ export function Intake({ settings }: { settings: OidcSettings }) {
     {state.kind === "idle" && <EmptyState title="Chưa tra cứu phiếu">Nhập hai mã ở trên để xem phiếu qua Junctura. Chưa có hồ sơ nào được tiếp nhận vào hàng đợi.</EmptyState>}
     {state.kind === "loading" && <Skeleton lines={5} />}
     {state.kind === "error" && <ReferralFailure code={state.code} />}
-    {state.kind === "success" && <ReferralDetails value={state.value} />}
+    {state.kind === "success" && <><ReferralDetails value={state.value} />
+      <AdmissionForm key={state.value.executionId} settings={settings} result={state.value} suggested={suggested} onShowQueue={onShowQueue} /></>}
   </div>;
-}
-export function ReferralFailure({ code }: { code: string }) {
-  if (code === "subject_consent_required") return <PermissionState title="Chưa có đồng thuận">
-    Nhờ người bệnh cấp đồng thuận cho Hospital đối với hồ sơ chuyển tuyến, mục đích tiếp nhận chuyển tuyến, trong MyHealth. Sau đó bấm tra cứu lại. Không thể dùng truy cập cấp cứu cho phiếu này.
-  </PermissionState>;
-  if (["forbidden", "referral_access_denied", "referral_capability_unavailable"].includes(code)) return <PermissionState title="Chưa có quyền tra cứu phiếu">
-    Liên hệ quản trị viên kiểm tra ứng dụng Clinic, hợp đồng và quyền Hospital gọi hồ sơ chuyển tuyến qua Junctura.
-  </PermissionState>;
-  if (code === "sign_in_required") return <PermissionState title="Phiên đăng nhập đã hết hạn">Đăng xuất rồi đăng nhập lại qua Junctura để tiếp tục.</PermissionState>;
-  const message = code === "referral_timeout" ? "Tra cứu quá thời gian chờ. Kiểm tra kết nối trước khi bấm tra cứu lại."
-    : code === "invalid_lookup" ? "Kiểm tra mã người bệnh và mã phiếu rồi tra cứu lại."
-    : code === "invalid_referral_output" ? "Phiếu trả về không đúng hợp đồng. Liên hệ đơn vị chuyển tuyến để kiểm tra."
-    : code === "referral_provider_failed" ? "Không lấy được phiếu từ trạm. Kiểm tra đúng mã người bệnh, mã phiếu và kết nối với đơn vị chuyển tuyến."
-    : "Kiểm tra kết nối Junctura và cấu hình nhà cung cấp, sau đó bấm tra cứu lại.";
-  return <ErrorState title="Chưa lấy được phiếu chuyển tuyến">{message}</ErrorState>;
 }
 export function ReferralDetails({ value }: { value: ReferralResult }) {
   const item = value.referral;
@@ -85,6 +81,6 @@ export function ReferralDetails({ value }: { value: ReferralResult }) {
         ["Chẩn đoán sơ bộ", [item.provisionalDiagnosis.code, item.provisionalDiagnosis.name].filter(Boolean).join(" · ")],
         ["Xử trí đã làm", item.treatmentGiven] ].map(([label, text]) => <div key={label} className="min-w-0"><dt className="text-sm text-muted">{label}</dt><dd className="whitespace-pre-wrap break-words text-ink">{text || "Chưa rõ"}</dd></div>)}
     </dl>
-    <AlertBanner level="info" title="Đối chiếu trước khi tiếp nhận">Mức khẩn trên phiếu do nơi chuyển cung cấp. Bản này chỉ tra cứu, chưa ghi nhận lượt tiếp nhận hay thay thế đánh giá của bác sĩ.</AlertBanner>
+    <AlertBanner level="info" title="Đối chiếu trước khi tiếp nhận">Mức khẩn trên phiếu do nơi chuyển cung cấp. Đối chiếu người bệnh và dùng mục Xác nhận tiếp nhận bên dưới để tạo lượt chờ khám.</AlertBanner>
   </Section>;
 }

@@ -7,7 +7,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
   return <LandingPage product="Hospital" badge="Bệnh viện · Bản demo"
     headline="Kết nối thông tin, tiếp nối chăm sóc"
     lead="Không gian làm việc dành cho bác sĩ và nhân viên tiếp nhận trong hệ sinh thái Junctura Health."
-    note="Đã có đăng nhập và tra cứu phiếu chuyển tuyến qua Junctura. Các luồng khám, kê đơn và cấp cứu đang được xây dựng; chỉ dùng dữ liệu giả lập."
+    note="Đã có đăng nhập, tiếp nhận chuyển tuyến và hàng đợi qua Junctura. Các luồng khám, kê đơn và cấp cứu đang được xây dựng; chỉ dùng dữ liệu giả lập."
     onSignIn={onSignIn}
     hero={<PreviewFrame label="Các bước dự kiến của Hospital" title="Hospital · Hướng phát triển">
       <div className="space-y-4"><Badge>Đang xây dựng</Badge>
@@ -22,11 +22,11 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
     steps={{ title: "Kết nối qua nền tảng chung", items: [
       { title: "Đăng nhập Junctura", text: "Mật khẩu chỉ nhập trên trang định danh Junctura." },
       { title: "Kiểm tra quyền Hospital", text: "Máy chủ chỉ cho tài khoản bác sĩ đã được cấu hình vào không gian làm việc." },
-      { title: "Phát triển nghiệp vụ từng bước", text: "Tiếp nhận, khám và cấp cứu sẽ được bổ sung theo các Issue riêng." },
+      { title: "Phát triển nghiệp vụ từng bước", text: "Tiếp nhận và hàng đợi đã có; khám và cấp cứu sẽ được bổ sung theo các Issue riêng." },
     ] }}
     audiences={{ title: "Dành cho đội ngũ bệnh viện", items: [
       { title: "Bác sĩ", text: "Theo dõi người bệnh trong ca khám, biết dữ liệu đến từ đâu." },
-      { title: "Nhân viên tiếp nhận", text: "Luồng tiếp nhận và vai trò riêng sẽ được bổ sung ở giai đoạn sau." },
+      { title: "Nhân viên tiếp nhận", text: "Hiện bác sĩ thực hiện tiếp nhận; vai trò nhân viên riêng sẽ được bổ sung sau." },
     ] }}
     trust={{ title: "Dùng chung dịch vụ Junctura", items: [
       { title: "Không lưu mật khẩu", text: "Ứng dụng dùng đăng nhập OIDC và PKCE." },
@@ -34,7 +34,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
       { title: "Mã nguồn mở", text: "Apache-2.0; đóng góp qua Issue và Pull Request." },
     ] }}
     faq={{ title: "Trước khi bắt đầu", items: [
-      { q: "Bản này đã dùng để khám bệnh chưa?", a: "Chưa. Bản demo có đăng nhập và tra cứu phiếu; chưa xử lý khám bệnh hay xác nhận tiếp nhận." },
+      { q: "Bản này đã dùng để khám bệnh chưa?", a: "Chưa. Bản demo có đăng nhập, tra cứu phiếu, xác nhận tiếp nhận và gọi vào khám; chưa xử lý khám bệnh." },
       { q: "Ai có thể đăng nhập?", a: "Tài khoản physician thuộc Hospital trong môi trường Health demo đã cấu hình." },
     ] }}
     cta={{ title: "Mở không gian Hospital", lead: "Dùng tài khoản Junctura được cấp cho bệnh viện." }}

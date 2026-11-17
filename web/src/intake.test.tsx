@@ -32,7 +32,8 @@ it("shows empty, loading, patient context, source and date without inventing dem
   expect(await screen.findByText("Lý do chuyển giả lập")).toBeTruthy();
   expect(screen.getByText(/Nguồn: Clinic/)).toBeTruthy();
   expect(screen.getByText(/Phát hành/)).toBeTruthy();
-  expect(screen.queryByRole("button", { name: /Xác nhận tiếp nhận|Truy cập cấp cứu/ })).toBeNull();
+  expect(screen.queryByRole("button", { name: "Truy cập cấp cứu" })).toBeNull();
+  expect((screen.getByRole("button", { name: "Xác nhận tiếp nhận" }) as HTMLButtonElement).disabled).toBe(true);
 });
 it("clears previous data immediately and ignores late results after changing patient", async () => {
   let finish!: (value: ReferralResult) => void;

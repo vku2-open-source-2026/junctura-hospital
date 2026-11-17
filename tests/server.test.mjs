@@ -21,9 +21,9 @@ async function fixture(t, options = {}) {
   const signer = makeSigner();
   const dir = mkdtempSync(join(tmpdir(), "hospital-test-"));
   writeFileSync(join(dir, "index.html"), "<html lang='vi'>Hospital shell</html>");
-  const config = { issuer: ISSUER, webClientId: CLIENT, facility: "Bệnh viện thử nghiệm", staticDir: dir, clientSecret: "never-public" };
+  const config = { issuer: ISSUER, webClientId: CLIENT, facility: "Bệnh viện thử nghiệm", staticDir: dir, clientSecret: "never-public", demoEnabled: options.demoEnabled };
   const verifier = options.verifier ?? createVerifier({ issuer: ISSUER, clientId: CLIENT, getJson: async () => ({ keys: [signer.jwk] }) });
-  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral }));
+  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral, admissions: options.admissions, examples: options.examples }));
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -91,10 +91,40 @@ test("lookup API authenticates before Core and requires bounded JSON POST", asyn
   assert.equal((await request("/api/referrals/lookup?patient=private", {}, init)).status, 400);
   assert.equal((await request("/api/referrals/lookup", {}, { ...init, body: "{" })).status, 400);
   assert.equal((await request("/api/referrals/lookup", {}, { ...init, headers: { "content-type": "text/plain" } })).status, 415);
-  assert.equal((await request("/api/referrals/lookup", {}, { ...init, body: "x".repeat(2049) })).status, 413);
+  assert.equal((await request("/api/referrals/lookup", {}, { ...init, body: "x".repeat(4097) })).status, 413);
   const response = await request("/api/referrals/lookup", {}, init);
   assert.equal(response.status, 200);
   assert.equal(response.headers.get("cache-control"), "no-store");
   assert.deepEqual(await response.json(), { requested: "CT-TEST" });
   assert.equal(calls, 1);
+});
+
+
+test("admission routes require Hospital physician and use the verified actor", async t => {
+  let actor; let writes = 0;
+  const { request } = await fixture(t, { admissions: {
+    list: async () => ({ items: [], atCapacity: false }),
+    admit: async (body, user) => { writes++; actor = user; return { created: true, admission: { id: "saved" } }; },
+    call: async id => { writes++; return { admission: { id, status: "called" } }; },
+  } });
+  const init = { method: "POST", headers: { "content-type": "application/json" }, body: "{}" };
+  assert.equal((await request("/api/admissions", null, init)).status, 401);
+  assert.equal((await request("/api/admissions", { sub: "insurance-subject", preferred_username: "giamdinh.baohiem" }, init)).status, 403);
+  assert.equal(writes, 0);
+  assert.equal((await request("/api/admissions", {}, init)).status, 201);
+  assert.equal(actor.subject, "doctor-subject");
+  assert.equal((await request("/api/admissions", {})).status, 200);
+  assert.equal((await request("/api/admissions?patient=private", {})).status, 400);
+  const path = "/api/admissions/22222222-2222-4222-8222-222222222222/call";
+  assert.equal((await request(path, {}, { ...init, body: '{"workflowId":"injected"}' })).status, 400);
+  assert.equal((await request(path, {}, init)).status, 200);
+  assert.equal(writes, 2);
+});
+
+test("synthetic demo examples are opt-in and authenticated", async t => {
+  const disabled = await fixture(t, { examples: [{ referralId: "DEMO" }] });
+  assert.equal((await disabled.request("/api/demo/referrals", {})).status, 404);
+  const enabled = await fixture(t, { demoEnabled: true, examples: [{ referralId: "DEMO" }] });
+  assert.equal((await enabled.request("/api/demo/referrals", null)).status, 401);
+  assert.deepEqual(await (await enabled.request("/api/demo/referrals", {})).json(), { items: [{ referralId: "DEMO" }] });
 });
