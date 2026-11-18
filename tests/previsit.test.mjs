@@ -5,7 +5,7 @@ import test from "node:test";
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { buildManifest } from "@junctura/health-contracts";
-import { createPrevisitLookup, validSummary } from "../server/previsit.mjs";
+import { createPrevisitLookup, createAllergyLookup, validSummary } from "../server/previsit.mjs";
 const providerAppId = "11111111-1111-4111-8111-111111111111",
   subject = "22222222-2222-4222-8222-222222222222",
   executionId = "33333333-3333-4333-8333-333333333333";
@@ -127,4 +127,11 @@ test("cancellation and bad patient IDs never submit a capability", async () => {
     code: "summary_timeout",
   });
   assert.equal(f.calls.length, 0);
+});
+
+test("allergy-list uses its own Health manifest and treatment consent",async()=>{
+ const m=buildManifest("allergy-list",providerAppId),published={state:"published",capabilityId:m.capabilityId,providerAppId,version:m.version,digest:`sha256:${createHash("sha256").update(canonical(m)).digest("hex")}`};const calls=[];
+ const output={allergies:example.allergies,allergyState:example.allergyState,updatedAt:example.updatedAt};
+ const lookup=createAllergyLookup({providerAppId,junctura:{discover:async()=>({items:[published]}),execute:async(...args)=>{calls.push(args);return {executionId};},waitForExecution:async()=>({state:"succeeded",output})}});
+ assert.deepEqual((await lookup(subject)).summary,output);assert.equal(calls[0][0].capability.capabilityId,m.capabilityId);assert.deepEqual(calls[0][3],{purpose:"treatment",dataSubject:subject});
 });

@@ -4,7 +4,7 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); chưa có kê đơn, cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); có kê đơn với kiểm tra dị ứng và provider xác minh đơn (Issue #10); chưa có cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
@@ -66,7 +66,7 @@ Biến môi trường ưu tiên hơn file env của Health. `.env` tại Hospita
 - POST /api/admissions/{id}/call: body `{}`, gọi vào khám bằng hoàn tất bước chờ của BPMN.
 - GET /api/demo/referrals: mẫu giả lập, chỉ bật trong demo và sau xác thực bác sĩ.
 
-Các API nghiệp vụ yêu cầu Bearer token physician và không nhận định danh qua query. JSON POST giới hạn 4 KiB; riêng API khám giới hạn 16 KiB. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
+Các API nghiệp vụ yêu cầu Bearer token physician và không nhận định danh qua query. JSON POST giới hạn 4 KiB; riêng API khám giới hạn 16 KiB, API kê đơn 32 KiB. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
 
 ## Tra cứu chuyển tuyến
 
@@ -154,9 +154,64 @@ API mới (POST JSON, physician):
 - `/api/examinations/summary` — `{ admissionId }`, đọc tóm tắt qua Core với mục đích điều trị.
 - `/api/examinations/notes` — `{ admissionId, requestId, reason, findings, diagnosis: { code, name }, plan }`, trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu. Server gắn bác sĩ từ token đã xác minh.
 
+## Kê đơn và xác minh đơn (Issue #10)
+
+Lưu ghi nhận khám trước, rồi chọn **Kê đơn từ ghi nhận này**. Chọn thuốc/hàm lượng từ danh mục chung `HOSPITAL_DRUGS` của Health; tự nhập số lượng và cách dùng, không tự điền liều. Tối đa 20 thuốc không trùng, số lượng 1–1000 theo hợp đồng. Thời hạn đơn trong demo chọn 1–30 ngày; đây là giới hạn sản phẩm demo, không phải quy định về đơn thuốc.
+
+Bấm **Kiểm tra dị ứng và xem lại đơn**: Hospital gọi `allergy-list` qua Core với input `{}` và `purpose: treatment`, dataSubject lấy từ lượt Hospital. Đồng thuận cho `pre-visit-summary` chưa bao gồm `allergy-list`. Thiếu đồng thuận hoặc lỗi nguồn thì không phát hành; không có đường bỏ qua quyền bằng lý do. Dữ liệu chưa ghi nhận hoặc cũ hơn 365 ngày cần bác sĩ rà soát và ghi lý do. Kết quả có nguồn/ngày và giữ đúng bốn trạng thái dị ứng.
+
+Quy tắc demo chỉ so tên thuốc/chất dị ứng và ánh xạ **Penicillin → Amoxicillin**, tham khảo [NHS về Amoxicillin](https://www.nhs.uk/medicines/amoxicillin/who-can-and-cannot-take-amoxicillin/). Đây không phải cơ sở dữ liệu tương tác, tá dược, thương hiệu hoặc toàn bộ phản ứng chéo; không suy ra một thuốc an toàn vì chưa phát hiện khớp. Không chẩn đoán, gợi ý thuốc hoặc tính liều. Khi có xung đột, giao diện hiển thị cảnh báo chặn; để tiếp tục trong demo bác sĩ phải nhập lý do tối thiểu 10 ký tự và xác nhận riêng. Quy tắc chưa được thẩm định lâm sàng; chỉ dùng dữ liệu giả lập.
+
+Đổi thuốc/số lượng/cách dùng/hạn hoặc ghi nhận làm căn cứ sẽ bỏ kết quả kiểm tra cũ. Sau khi xem lại, đánh dấu đã rà soát rồi **Phát hành đơn thuốc**. Backend kiểm tra lại quyền và dị ứng tại thời điểm phát hành, gắn bác sĩ từ token đã xác minh, giữ lý do/các cảnh báo trong bản ghi. Nếu dữ liệu thay đổi, server có thể yêu cầu rà soát lại dù bước xem trước đã qua.
+
+Đơn lưu trong Core app-private collection `hospital_prescriptions_v1`; mã `DT-…` ổn định theo request UUID, có thời điểm lập/hết hạn và căn cứ ghi nhận khám. Bấm lặp cùng thao tác không tạo đơn mới. Mất phản hồi giữ nguyên nội dung/mã, có nút kiểm tra kết quả phát hành hoặc thử lại cùng thao tác. Bản nhập chưa phát hành ở bộ nhớ màn hình; nếu tải lại khi chưa rõ kết quả, kiểm tra danh sách đơn trước khi nhập lại.
+
+Tab **Đơn thuốc** hiển thị đơn đã lưu và hết hạn. Chưa có sửa/hủy, in/QR hoặc đồng bộ phát thuốc. `dispensed` khởi tạo false; nhãn **Chưa ghi nhận phát thuốc** không xác nhận thực tế nhà thuốc chưa phát. Hợp đồng `prescription-verify` chỉ đọc, chưa có hợp đồng gửi kết quả phát thuốc về Hospital. Giới hạn một writer/100 bản ghi như các module demo khác; không cam kết exactly-once nhiều replica. Khi chạm giới hạn, dừng tạo/xác minh để không trả sai vì dữ liệu nằm ngoài trang đầu.
+
+### Thử kê đơn
+
+1. An đã có lượt gọi vào khám và ghi nhận đã lưu. Chạy `npm run demo:rx:prepare` để chuẩn bị riêng quyền allergy-list/treatment 24 giờ cho An giả lập.
+2. Khám → mở An → **Kê đơn từ ghi nhận này**. Chọn Amoxicillin và nhập nội dung kiểm thử, bấm kiểm tra: thấy cảnh báo Penicillin nặng, nút phát hành vẫn khóa nếu thiếu lý do/xác nhận.
+3. Có thể đổi thuốc trong danh mục để kiểm tra việc bỏ kết quả cũ; đây chỉ là thao tác thử phần mềm, không phải gợi ý thay thuốc. Nhập lại kiểm tra, xem lại rồi phát hành đơn giả lập.
+4. Tải lại trang, mở Đơn thuốc: mã và nội dung vẫn còn. `npm run demo:rx:clear` chỉ thu hồi quyền do helper này tạo; không ảnh hưởng quyền tóm tắt hoặc phiếu chuyển tuyến.
+
+### Provider xác minh cho Pharmacy
+
+Runtime provider bật bằng `PROVIDER_TLS_CERT`, `PROVIDER_TLS_KEY`, `PROVIDER_PORT` (8443) và `PROVIDER_BIND` (mặc định loopback). Đọc `JUNCTURA_PHARMACY_APP_ID` hoặc app ID từ env Pharmacy do Health tạo, không đưa credential Pharmacy vào Hospital runtime. Có chế độ chỉ chạy provider: `node server/provider-main.mjs`.
+
+Provider nhận `POST /capabilities/prescription-verify`. Dùng SDK `redeemTicket` của Core cho vé một lần và input digest, sau đó đối chiếu capability/version/digest, ứng dụng provider/caller, invocation và context `dispensing`. Không chấp nhận quyền xem phiếu/tóm tắt hoặc cấp cứu. Chỉ đọc đơn của đúng dataSubject trong vé. Trả đúng `{ output: { valid, issuedAt, expiresAt, items, dispensed } }`; không có tên, chẩn đoán hay ghi khám. Đơn sai người/không tồn tại trả valid=false, items rỗng và mốc ngày placeholder 1970 bắt buộc theo schema; đơn hết hạn không trả danh sách thuốc. Chưa có chức năng đánh dấu phát thuốc.
+
+Để chạy provider local trong mạng Compose của Core, chuẩn bị tại repo DX-OS:
+
+```powershell
+npm run provider:pki -- clinic hospital
+# Giữ origin Clinic và bổ sung Hospital trong .env:
+# C4A_INTERNAL_PROVIDER_ORIGINS=["https://clinic.provider.internal:8443","https://hospital.provider.internal:8443"]
+docker compose -f compose.yaml -f compose.providers.yaml up -d core
+```
+
+Tại Hospital:
+
+```powershell
+npm run demo:provider:up
+npm run demo:pharmacy:prepare
+npm run test:prescriptions:live
+```
+
+Helper Pharmacy chỉ cấp đồng thuận giả lập `prescription-verify/dispensing` cho An trong 24 giờ; `demo:pharmacy:clear` chỉ thu hồi quyền do helper đó tạo. Kiểm thử live cần đã có đơn An chưa hết hạn, không tự kê thêm đơn. Nó dùng client Pharmacy → Core → provider TLS, xác minh đơn có thật và mã không tồn tại, kiểm tra đúng trường hợp đồng. Core vẫn xử lý grant, đồng thuận và audit.
+
+Compose provider local không mở host port, dùng CA riêng có kiểm tra hostname, tách mạng provider/edge, mount mã/node_modules/seed công khai và đúng key Hospital ở chế độ chỉ đọc. Loopback bridge chỉ phục vụ SDK tới Gateway trong mạng demo; không phải cấu hình triển khai production. Core phải có image `junctura-core:local` và mạng edge/providers. Có thể đặt `JUNCTURA_DXOS_DIR`, `JUNCTURA_EDGE_NETWORK`, `JUNCTURA_PROVIDERS_NETWORK` khi khác mặc định. `npm run demo:provider:down` chỉ dừng container provider này, không xóa dữ liệu Core.
+
+API physician mới:
+
+- GET `/api/prescriptions`: danh sách đơn của Hospital.
+- POST `/api/prescriptions/open`: `{ admissionId }`, căn cứ khám, danh mục và đơn của lượt.
+- POST `/api/prescriptions/check`: `{ admissionId, noteId, items, validDays }`, kiểm tra dị ứng hiện tại.
+- POST `/api/prescriptions/issue`: như check, thêm `{ requestId, reviewConfirmed: true, overrideReason }`. Trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu.
+
 ## Năng lực còn lại
 
-Đã gọi `referral-summary` và `pre-visit-summary`; các năng lực `allergy-list`, `vaccination-history`, `prescription-verify` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
+Đã gọi `referral-summary` và `pre-visit-summary`; đã thêm `allergy-list` và provider `prescription-verify`; `vaccination-history` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
 
 ## Kiểm thử và giấy phép
 

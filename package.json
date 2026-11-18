@@ -32,7 +32,14 @@
     "demo:clear": "node scripts/prepare-referral-demo.mjs --clear",
     "demo:start": "node server/main.mjs --demo",
     "demo:exam:prepare": "node scripts/prepare-referral-demo.mjs --treatment",
-    "demo:exam:clear": "node scripts/prepare-referral-demo.mjs --treatment --clear"
+    "demo:exam:clear": "node scripts/prepare-referral-demo.mjs --treatment --clear",
+    "demo:rx:prepare": "node scripts/prepare-referral-demo.mjs --prescribing",
+    "demo:rx:clear": "node scripts/prepare-referral-demo.mjs --prescribing --clear",
+    "demo:pharmacy:prepare": "node scripts/prepare-referral-demo.mjs --pharmacy",
+    "demo:pharmacy:clear": "node scripts/prepare-referral-demo.mjs --pharmacy --clear",
+    "demo:provider:up": "node scripts/provider-demo.mjs",
+    "demo:provider:down": "node scripts/provider-demo.mjs --down",
+    "test:prescriptions:live": "node scripts/check-prescriptions-live.mjs"
   },
   "dependencies": {
     "@junctura/health-contracts": "^1.1.0",

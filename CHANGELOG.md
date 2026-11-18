@@ -4,6 +4,13 @@
 
 ## Unreleased
 
+- Issue #10: kê đơn từ ghi nhận khám, gọi allergy-list với treatment và kiểm tra lại trước phát hành.
+- Bốn trạng thái dị ứng, cảnh báo có lý do/xác nhận riêng, bỏ kết quả khi đổi nội dung đơn; không tự điền liều/cách dùng.
+- Lưu đơn trên Core với request ID, mã đơn, hạn và bác sĩ; đối chiếu mất phản hồi và danh sách đơn đã kê.
+- Provider prescription-verify qua SDK vé một lần của Core, kiểm tra người bệnh/caller/capability và trả đúng hợp đồng tối thiểu.
+- Compose provider HTTPS local không mở host port, helper consent giả lập và kiểm thử live từ Pharmacy qua Core.
+
+
 - Issue #8: mở người bệnh đã được gọi vào khám, xem tóm tắt trước khám qua Core với mục đích điều trị.
 - Hiển thị nguồn/ngày và bốn trạng thái dị ứng, nêu dị ứng nặng, đối chiếu định danh hai cơ sở; không thêm giờ cho ngày khám từ trạm.
 - Ghi nhận khám do bác sĩ nhập lưu thành từng bản trên Core; nhận diện thao tác gửi lại và đối chiếu khi mất phản hồi.
