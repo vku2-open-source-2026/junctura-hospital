@@ -251,7 +251,7 @@ API mới (physician, không nhận định danh qua query, JSON POST tối đa 
 
 ## Năng lực còn lại
 
-Đã gọi `referral-summary` và `pre-visit-summary`; đã thêm `allergy-list` và provider `prescription-verify`; `vaccination-history` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
+Đã gọi `referral-summary` và `pre-visit-summary`; đã thêm `allergy-list` và provider `prescription-verify`; đã thêm provider `claim-verify`; `vaccination-history` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
 
 ## Kiểm thử và giấy phép
 
@@ -267,3 +267,29 @@ npm run check:reuse
 Nếu Python hệ thống chưa có pip, có thể dùng `uv run --no-project --python 3.12 --with-requirements requirements-reuse.txt python -m reuse lint`. Bản build giữ thông báo bản quyền thư viện/font trong `web/dist/notices/`.
 
 Apache-2.0. Khung cấu hình, xác minh token và PKCE tái sử dụng từ Clinic; giao diện dùng @junctura/health-ui. Xem NOTICE, THIRD-PARTY.md và CONTRIBUTING.md.
+
+## Chi phí và xác minh cho bảo hiểm (Issue #14)
+
+Trong **Khám**, mở người bệnh đã được gọi, chọn **Lập chi phí từ ghi nhận này** ở một ghi nhận đã lưu. Nhập 1–20 khoản, mô tả, số lượng nguyên 1–1000 và đơn giá nguyên VND (cho phép 0). Máy chủ tự tính tổng, tối đa 1.000.000.000.000 VND; không nhận tổng tiền hay định danh bác sĩ từ trình duyệt. Đơn giá là dữ liệu nhập cho demo, không phải biểu giá chính thức.
+
+Xác nhận đúng người bệnh và nội dung rồi **Lưu hồ sơ chi phí**. Mỗi hồ sơ có mã `HS-...`, thời gian, người lập, ghi nhận khám gốc và được lưu trong collection riêng `hospital_costs_v1` của ứng dụng trên Core. Tab **Chi phí** đọc lại các hồ sơ. Bản demo chưa có chỉnh sửa/hủy, gửi yêu cầu bảo hiểm, phê duyệt hay thanh toán. Trạng thái **Chưa có phản hồi từ bảo hiểm** phản ánh điều đó; kết quả xác minh không phải quyết định chi trả.
+
+Nếu mất phản hồi khi lưu, nội dung bị khóa và **Thử lại cùng hồ sơ chi phí** gửi cùng request ID. Không thoát màn/tải lại trang hoặc tạo thao tác mới khi chưa rõ kết quả; mã thử lại hiện chỉ giữ trong phiên màn hình. Máy chủ đối chiếu request ID với Core khi mất phản hồi và sau khởi động lại. Demo giới hạn 100 dòng dữ liệu thô và một tiến trình ghi; Core hiện chưa có transaction/CAS nên không bảo đảm exactly-once giữa nhiều replica. Khi đạt giới hạn, việc xác minh trả lỗi, không trả một kết quả không khớp sai lệch.
+
+Provider HTTPS dùng chung `compose.provider-demo.yaml`, không mở cổng host. Endpoint `/capabilities/claim-verify` chỉ đọc sau khi đổi vé một lần bằng SDK Core, kiểm tra caller Insurance, provider, capability/version/digest, invocation, người bệnh và mục đích `claim_review`. Không cho cấp cứu. Core kiểm tra grant/đồng thuận và ghi nhật ký; Hospital không tự cấp quyền. Input đúng hợp đồng Health `{claimId, amountVnd}`; output chỉ `{matches, checkedAt}`. Không trả số tiền đúng, tên người bệnh, dòng chi phí hoặc chẩn đoán. Mã không tồn tại, sai người bệnh hoặc sai số tiền đều trả `matches:false`; lỗi hạ tầng trả lỗi.
+
+Kiểm thử với dữ liệu giả An và Core local đã được Health đăng ký grant:
+
+```powershell
+npm run demo:provider:up
+npm run demo:insurance:prepare
+npm run demo:start
+# Mở http://localhost:5182, lập một hồ sơ chi phí giả cho An.
+npm run test:costs:live
+# Thu hồi riêng đồng thuận do helper này đã tạo khi kết thúc demo:
+npm run demo:insurance:clear
+```
+
+Helper chỉ dùng tài khoản giả An và cấp/kiểm tra đồng thuận claim-verify cho Insurance trong 24 giờ. Test live dùng client Insurance qua Core và provider TLS Hospital, kiểm tra đúng tiền, sai tiền và mã không tồn tại, cùng đúng hai trường output. Nó không tạo hồ sơ bảo hiểm, quyết định hay giao dịch tiền. UI Insurance chưa được triển khai trong module này.
+
+API bác sĩ mới: GET `/api/costs`, POST `/api/costs/open` `{admissionId}`, POST `/api/costs/create` `{admissionId,noteId,requestId,items,confirmed:true}`. POST chỉ nhận JSON tối đa 16 KiB; không nhận mã người bệnh qua query. Backend bắt buộc ghi nhận khám thuộc đúng lượt đã gọi và lấy người bệnh từ hồ sơ trên Core.

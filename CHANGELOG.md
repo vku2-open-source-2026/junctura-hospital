@@ -4,6 +4,12 @@
 
 ## Unreleased
 
+- Issue #14: lập hồ sơ chi phí từ ghi nhận khám, tính tổng nguyên VND tại backend và lưu Core app-private.
+- Giao diện Health UI có đối chiếu người bệnh, danh sách, khóa/thử lại cùng request và trạng thái chưa có phản hồi bảo hiểm.
+- Provider claim-verify kiểm tra vé Core/caller Insurance/mục đích claim_review, chỉ trả matches/checkedAt.
+- Helper đồng thuận giả lập riêng và test Insurance -> Core -> Hospital TLS; không tạo quyết định hay giao dịch thanh toán.
+
+
 - Issue #12: truy cập cấp cứu pre-visit-summary/allergy-list qua Core, lý do và xác nhận hai bước bằng Health UI.
 - Dải cấp cứu/định danh dính khi cuộn, nguồn/ngày/bốn trạng thái dị ứng; kết thúc/đổi màn bỏ hồ sơ, giới hạn xem 5 phút.
 - Chỉ mục yêu cầu gắn bác sĩ với execution trên Core, idempotency và đối chiếu mất phản hồi; lịch sử không trả nội dung y tế.
