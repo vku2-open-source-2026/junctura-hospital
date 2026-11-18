@@ -59,7 +59,8 @@ export function createPrevisitLookup({
   slug = "pre-visit-summary",
 }) {
   const contract = getContract(slug);
-  return async (patientSubject, signal) => {
+  return async (patientSubject, signal, emergency) => {
+    if (emergency && (!contract.emergencyAccess || !["pre-visit-summary","allergy-list"].includes(slug) || !uuid.test(emergency.operationId ?? "") || typeof emergency.justification !== "string" || [...emergency.justification].length < 10 || [...emergency.justification].length > 500 || !emergency.justification.isWellFormed() || /[\u0000-\u001f\u007f]/u.test(emergency.justification))) throw new ExaminationError(400,"invalid_emergency_access");
     if (!uuid.test(patientSubject ?? ""))
       throw new ExaminationError(400, "invalid_examination");
     if (!junctura || !uuid.test(providerAppId ?? ""))
@@ -107,11 +108,12 @@ export function createPrevisitLookup({
           },
         },
         {},
-        undefined,
-        { purpose: "treatment", dataSubject: patientSubject },
+        emergency?.operationId,
+        { purpose: "treatment", dataSubject: patientSubject, ...(emergency ? {emergency:true,justification:emergency.justification} : {}) },
       );
       if (!uuid.test(execution.executionId ?? ""))
         throw new ExaminationError(502, "invalid_summary");
+      if (emergency?.onReserved) await emergency.onReserved(execution.executionId);
       const result = await junctura.waitForExecution(execution.executionId, {
         timeoutMs: 20000,
         intervalMs: 500,
@@ -133,6 +135,7 @@ export function createPrevisitLookup({
       };
     } catch (error) {
       if (error instanceof ExaminationError) throw error;
+      if (error.code === "emergency_review_backlog") throw new ExaminationError(429,"emergency_review_backlog");
       if (error.code === "subject_consent_required")
         throw new ExaminationError(403, "treatment_consent_required");
       if (error.status === 403)

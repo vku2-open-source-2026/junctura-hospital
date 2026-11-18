@@ -17,3 +17,10 @@ export function demoCases(healthDir, subjects = {}) {
       label: index === 0 ? "An — thử xem phiếu" : `${patient.patientName} — thử thiếu đồng thuận`, expected: index === 0 ? "allowed" : "denied" };
   });
 }
+
+export function emergencyDemo(healthDir,subjects={}) {
+ const accounts=JSON.parse(readFileSync(resolve(healthDir,"seed/data/accounts.json"),"utf8")).users;
+ const binh=accounts.find(v=>v.username==="benhnhan.binh");
+ if(!binh)throw new Error("Missing synthetic Binh account");
+ return {patientSubject:subjects[binh.subject]??binh.subject,label:"Bình — thử truy cập cấp cứu",username:binh.username};
+}

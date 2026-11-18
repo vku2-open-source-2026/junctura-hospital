@@ -13,7 +13,7 @@ const TYPES = { ".html": "text/html; charset=utf-8", ".js": "text/javascript; ch
   ".css": "text/css; charset=utf-8", ".svg": "image/svg+xml", ".woff2": "font/woff2", ".woff": "font/woff" };
 
 // Thin application boundary adapted from Clinic. Identity stays in Junctura.
-export function createApp({ config, staff, verifier, lookupReferral, admissions, examinations, prescriptions, examples }) {
+export function createApp({ config, staff, verifier, lookupReferral, admissions, examinations, prescriptions, emergency, emergencyExample, examples }) {
   const headers = { "x-content-type-options": "nosniff", "referrer-policy": "no-referrer",
     "x-frame-options": "DENY", "cache-control": "no-store",
     "content-security-policy": `default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; connect-src 'self' ${new URL(config.issuer).origin}; img-src 'self' data:; style-src 'self' 'unsafe-inline'` };
@@ -49,10 +49,20 @@ export function createApp({ config, staff, verifier, lookupReferral, admissions,
           if (!prescriptions) throw new PrescriptionError(503,"prescriptions_not_configured");
           return send(200,await prescriptions.list());
         }
+        if (path === "/api/emergency/demo" && req.method === "GET") {
+          if (!config.demoEnabled || !emergencyExample) return send(404,{error:"not_found"});
+          return send(200, emergencyExample);
+        }
+        if (path === "/api/emergency/history" && req.method === "GET") {
+          if (url.search) return send(400,{error:"invalid_query"});
+          if (!emergency) throw new ExaminationError(503,"emergency_not_configured");
+          return send(200,await emergency.history());
+        }
+        const emergencyAction = /^\/api\/emergency\/(access|end)$/.exec(path)?.[1];
         const rxAction = /^\/api\/prescriptions\/(open|check|issue)$/.exec(path)?.[1];
         const examAction = /^\/api\/examinations\/(open|summary|notes)$/.exec(path)?.[1];
         const callMatch = /^\/api\/admissions\/([0-9a-f-]{36})\/call$/.exec(path);
-        if (path === "/api/referrals/lookup" || path === "/api/admissions" || callMatch || examAction || rxAction) {
+        if (path === "/api/referrals/lookup" || path === "/api/admissions" || callMatch || examAction || rxAction || emergencyAction) {
           if (req.method !== "POST") return send(405, { error: "method_not_allowed" });
           if (url.search) return send(400, { error: "invalid_lookup" });
           if (!/^application\/json(;|$)/i.test(req.headers["content-type"] ?? "")) return send(415, { error: "json_required" });
@@ -66,15 +76,16 @@ export function createApp({ config, staff, verifier, lookupReferral, admissions,
           try { body = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(Buffer.concat(chunks))); }
           catch { return send(400, { error: "invalid_json" }); }
           if (path === "/api/referrals/lookup" && !lookupReferral) throw new ReferralError(503, "referrals_not_configured");
+          if (emergencyAction && !emergency) throw new ExaminationError(503,"emergency_not_configured");
           if (rxAction && !prescriptions) throw new PrescriptionError(503,"prescriptions_not_configured");
           if (examAction && !examinations) throw new ExaminationError(503, "examinations_not_configured");
-          if (path !== "/api/referrals/lookup" && !admissions && !examAction && !rxAction) throw new AdmissionError(503, "admissions_not_configured");
+          if (path !== "/api/referrals/lookup" && !admissions && !examAction && !rxAction && !emergencyAction) throw new AdmissionError(503, "admissions_not_configured");
           const cancellation = new AbortController();
           const disconnect = () => cancellation.abort();
           res.once("close", disconnect);
           try {
             if (callMatch && (!body || typeof body !== "object" || Array.isArray(body) || Object.keys(body).length)) return send(400, { error: "empty_object_required" });
-            const result = rxAction ? await (rxAction === "open" ? prescriptions.open(body) : rxAction === "check" ? prescriptions.check(body,cancellation.signal) : prescriptions.issue(body,user,cancellation.signal)) : examAction ? await (examAction === "open" ? examinations.open(body) : examAction === "summary" ? examinations.summary(body, cancellation.signal) : examinations.save(body, user)) : path === "/api/referrals/lookup" ? await lookupReferral(body, cancellation.signal)
+            const result = emergencyAction ? await (emergencyAction === "access" ? emergency.access(body,user,cancellation.signal) : emergency.end(body,user)) : rxAction ? await (rxAction === "open" ? prescriptions.open(body) : rxAction === "check" ? prescriptions.check(body,cancellation.signal) : prescriptions.issue(body,user,cancellation.signal)) : examAction ? await (examAction === "open" ? examinations.open(body) : examAction === "summary" ? examinations.summary(body, cancellation.signal) : examinations.save(body, user)) : path === "/api/referrals/lookup" ? await lookupReferral(body, cancellation.signal)
               : callMatch ? await admissions.call(callMatch[1]) : await admissions.admit(body, user, cancellation.signal);
             if (!res.destroyed) return send((path === "/api/admissions" || examAction === "notes" || rxAction === "issue") && result.created ? 201 : 200, result);
             return;

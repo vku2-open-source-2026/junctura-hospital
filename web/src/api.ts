@@ -84,3 +84,14 @@ export const listPrescriptions=(s:OidcSettings,signal?:AbortSignal)=>hospitalReq
 export const openPrescriptions=(s:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<RxWorkspace>(s,"/api/prescriptions/open",{admissionId},signal);
 export const checkPrescription=(s:OidcSettings,input:RxDraft,signal?:AbortSignal)=>hospitalRequest<RxCheck>(s,"/api/prescriptions/check",input,signal);
 export const issuePrescription=(s:OidcSettings,input:RxIssue,signal?:AbortSignal)=>hospitalRequest<{prescription:Prescription;created:boolean}>(s,"/api/prescriptions/issue",input,signal);
+
+export type EmergencyCapability="pre-visit-summary"|"allergy-list";
+export interface EmergencyInput {operationId:string;patientSubject:string;capability:EmergencyCapability;justification:string;identityConfirmed:true;confirmed:true}
+interface EmergencyMeta {operationId:string;executionId:string;patientSubject:string;justification:string;source:string;receivedAt:string;expiresAt:string}
+export type EmergencyResult=EmergencyMeta&({capability:"pre-visit-summary";summary:PrevisitSummary}|{capability:"allergy-list";summary:Pick<PrevisitSummary,"allergies"|"allergyState"|"updatedAt">});
+export interface EmergencyHistoryItem {operationId:string;executionId:string|null;patientSubject:string;capability:EmergencyCapability;justification:string;createdBy:{subject:string;displayName:string};requestedAt:string;endedAt:string|null;state:string;reviewState:string|null}
+export interface EmergencyHistoryResult {items:EmergencyHistoryItem[];atCapacity:boolean;reviewVisibility:"administrator"|"available"|"unavailable"}
+export const requestEmergency=(s:OidcSettings,input:EmergencyInput,signal?:AbortSignal)=>hospitalRequest<EmergencyResult>(s,"/api/emergency/access",input,signal);
+export const endEmergency=(s:OidcSettings,operationId:string)=>hospitalRequest<{ended:boolean}>(s,"/api/emergency/end",{operationId});
+export const emergencyHistory=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<EmergencyHistoryResult>(s,"/api/emergency/history",undefined,signal);
+export const getEmergencyDemo=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<{patientSubject:string;label:string}>(s,"/api/emergency/demo",undefined,signal);

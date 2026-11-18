@@ -4,7 +4,7 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); có kê đơn với kiểm tra dị ứng và provider xác minh đơn (Issue #10); chưa có cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); có kê đơn với kiểm tra dị ứng và provider xác minh đơn (Issue #10); có truy cập dữ liệu cấp cứu có lý do/hậu kiểm Core (Issue #12); chưa có xác minh chi phí. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
@@ -208,6 +208,46 @@ API physician mới:
 - POST `/api/prescriptions/open`: `{ admissionId }`, căn cứ khám, danh mục và đơn của lượt.
 - POST `/api/prescriptions/check`: `{ admissionId, noteId, items, validDays }`, kiểm tra dị ứng hiện tại.
 - POST `/api/prescriptions/issue`: như check, thêm `{ requestId, reviewConfirmed: true, overrideReason }`. Trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu.
+
+## Truy cập dữ liệu cấp cứu (Issue #12)
+
+Tab **Cấp cứu** dành cho bác sĩ Hospital đã xác thực; có thể mở từ màn Khám khi thiếu đồng thuận điều trị. Không cần lượt tiếp nhận hoặc phiếu chuyển tuyến: ca mẫu Bình chưa có phiếu vẫn dùng được. Đây là luồng truy cập dữ liệu khi cấp cứu, chưa phải chức năng quản lý điều trị cấp cứu, phân loại hay vận chuyển người bệnh.
+
+1. Nhập mã người bệnh và chọn **Tóm tắt trước khám** hoặc **Danh sách dị ứng**. Đối chiếu đúng người bệnh và đánh dấu xác nhận.
+2. **Nhập lý do truy cập cấp cứu**: hộp thoại Health UI gồm bước nhập lý do và bước xác nhận lại người bệnh/dữ liệu/lý do. Hủy ở một trong hai bước không tạo tác vụ Core.
+3. Hospital gọi đúng manifest/version/digest của Clinic qua SDK, input `{}`, context `{ purpose: "treatment", dataSubject, emergency: true, justification }`. Lý do 10–500 ký tự, không có ký tự điều khiển. Core cho bỏ kiểm tra đồng thuận trong trường hợp này, vẫn giữ grant/quyền ứng dụng, vé provider, nhật ký và hậu kiểm.
+4. Khi chờ/xem kết quả có dải **Đang truy cập khẩn cấp** kèm lý do và nút kết thúc, giữ cùng thanh định danh khi cuộn. Dữ liệu có nguồn/ngày và bốn trạng thái dị ứng. Riêng allergy-list không cung cấp định danh nên không tự điền họ tên/năm sinh/giới.
+5. **Kết thúc truy cập khẩn cấp** xóa hồ sơ khỏi màn xem và đóng yêu cầu tại Hospital; đổi tab/tải lại cũng bỏ nội dung trong bộ nhớ màn hình. Không xóa sự kiện Core, không thu hồi dữ liệu đã tải, không tự duyệt hậu kiểm. Màn xem tự đóng sau tối đa khoảng 5 phút; backend cũng chặn sử dụng lại yêu cầu quá 5 phút hoặc đã đóng. Không lưu bản sao hồ sơ vào app-private collection, localStorage hoặc sessionStorage.
+
+Chỉ hai năng lực trên được phép. Không dùng cấp cứu để mở `referral-summary`, `prescription-verify`, chi phí hoặc bỏ qua quyền kê đơn. Mỗi lần xác nhận chỉ gọi một năng lực, không âm thầm tạo hai tác vụ cấp cứu. Luồng kê đơn và đọc thông thường tiếp tục yêu cầu đồng thuận như trước.
+
+### Liên kết yêu cầu và lịch sử
+
+Hospital lưu **chỉ mục yêu cầu** trong Core app-private `hospital_emergency_requests_v1`: mã thao tác, mã người bệnh, năng lực, lý do, bác sĩ đã xác minh, thời điểm và mã execution. Không chứa kết quả y tế. Đây là metadata nghiệp vụ để nối lượt yêu cầu của bác sĩ với tác vụ Core; không thay thế nhật ký bảo vệ của Core và không có thuật toán audit/consent/review riêng.
+
+Chỉ mục được ghi trước khi gửi; server liên kết execution ngay sau khi Core nhận. Nếu mất phản hồi, thử lại giữ cùng mã idempotency, người bệnh, lý do và bác sĩ để đối chiếu. Không tự tạo mã mới khi kết quả chưa rõ. Một yêu cầu chưa liên kết không được coi là đã truy cập thành công; Core có thể đã nhận nhưng chưa trả mã về. Yêu cầu hết thời hạn cần xác nhận lại bằng mã mới nếu vẫn có lý do cấp cứu. Giới hạn demo một writer/100 bản ghi; chưa cam kết exactly-once nhiều replica hoặc khôi phục chỉ mục bị xóa ngoài ứng dụng.
+
+**Yêu cầu cấp cứu của Hospital** đọc metadata từ Core Data và trạng thái execution từ Core; không trả nội dung hồ sơ trong lịch sử. API kết quả hậu kiểm `/v1/emergency-accesses` yêu cầu `trust.approve`: với client Hospital thông thường, UI ghi rõ chỉ quản trị viên xem được kết quả, không suy diễn là đã duyệt/chờ duyệt. Nếu client đã có quyền đọc hợp lệ, chỉ hiện kết quả của những mã execution của Hospital trong chỉ mục. App không cấp thêm quyền quản trị và không cung cấp route duyệt.
+
+Core chặn khi có **5 lần truy cập chưa hậu kiểm cho cùng ứng dụng** (`429 emergency_review_backlog`), kể cả có nhiều bác sĩ. Khi chạm giới hạn, liên hệ quản trị viên DX-OS. Đóng màn xem không làm giảm số chờ hậu kiểm. Quản trị viên thực hiện qua API sẵn có:
+
+- GET `/v1/emergency-accesses`
+- POST `/v1/emergency-accesses/{executionId}/review`, `{ decision: "justified" | "unjustified", note }`
+
+Hospital không gọi API ghi quyết định này. Người bệnh xem lần truy cập và trạng thái hậu kiểm qua `/v1/me/data-access` bằng chính tài khoản của mình.
+
+### Thử với Bình giả lập
+
+Core và provider Clinic phải hoạt động; chạy Hospital bằng `npm run demo:start`. Trong **Cấp cứu**, bấm **Bình — thử truy cập cấp cứu**, đối chiếu mã, nhập lý do rõ đây là kiểm thử dữ liệu giả, xác nhận hai bước. Xem kết quả và kết thúc. Nút mẫu chỉ điền mã, không cấp đồng thuận. Không chạy nhiều lần liên tiếp để tránh làm đầy hàng hậu kiểm.
+
+`npm run test:emergency:live` kiểm chứng **yêu cầu Bình đã có** (có thể thêm executionId làm đối số). Script chỉ đọc: dùng client Hospital đọc metadata/trạng thái, đăng nhập Bình giả lập bằng helper PKCE của Core, kiểm tra không có đồng thuận tương ứng và kiểm tra nhật ký của chính Bình có `emergency=true`, `purpose=treatment` cùng trạng thái hậu kiểm. Nó không tạo thêm lần cấp cứu, không thu hồi consent và không duyệt/xóa mục chờ. Lần QA của module được giữ lại để quản trị viên kiểm tra.
+
+API mới (physician, không nhận định danh qua query, JSON POST tối đa 4 KiB):
+
+- GET `/api/emergency/demo`: mã mẫu chỉ trong chế độ demo, sau xác thực.
+- GET `/api/emergency/history`: chỉ mục yêu cầu và trạng thái đối chiếu Core.
+- POST `/api/emergency/access`: `{ operationId, patientSubject, capability, justification, identityConfirmed: true, confirmed: true }`; capability chỉ pre-visit-summary/allergy-list.
+- POST `/api/emergency/end`: `{ operationId }`; chỉ bác sĩ sở hữu yêu cầu được đóng. Không hủy execution hoặc quyết định hậu kiểm Core.
 
 ## Năng lực còn lại
 
