@@ -4,11 +4,11 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** demo. Đã có đăng nhập Junctura, phân quyền bác sĩ và tra cứu phiếu chuyển tuyến qua Core (Issue #4). Chưa xác nhận tiếp nhận vào hàng đợi/BPMN, khám, kê đơn hoặc xử lý cấp cứu. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có thao tác gọi vào khám; chưa triển khai khám, kê đơn, cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
-Node.js 24, Git; Docker/Compose để chạy Core. Đặt Hospital cạnh junctura-health và junctura-dxos. Bản sao Clinic chỉ để tham khảo, không cần khi chạy.
+Node.js 24, Git; Docker/Compose để chạy Core. Đặt Hospital cạnh junctura-health và junctura-dxos. Luồng chuyển tuyến cần provider Clinic đang chạy; giao diện Clinic không bắt buộc.
 
 ## Chuẩn bị Core và Health
 
@@ -57,11 +57,16 @@ Biến môi trường ưu tiên hơn file env của Health. `.env` tại Hospita
 ## API hiện có
 
 - GET /health: tiến trình Hospital đang chạy (không phải kiểm tra readiness của Core).
-- GET /api/config: chỉ issuer, client web, tên sản phẩm và cơ sở.
+- GET /api/config: issuer, client web, tên sản phẩm, cơ sở và cờ demo nếu được bật.
 - GET /api/me: danh tính bác sĩ đã xác minh; yêu cầu Bearer token.
 - POST /api/referrals/lookup: tra cứu qua Core; body JSON chỉ có `patientSubject` (Keycloak sub dạng UUID) và `referralId`, yêu cầu tài khoản physician. Không gửi mã qua URL.
 
-Chưa có API ghi hồ sơ hoặc provider. Chưa thêm database, workflow hay audit riêng. Core tự kiểm tra đồng thuận và ghi audit trao đổi; Hospital không tự thay thế các cơ chế này.
+- GET /api/admissions: hàng đợi từ collection riêng của Hospital trên Core và trạng thái workflow.
+- POST /api/admissions: xác nhận tiếp nhận; chỉ nhận `patientSubject`, `referralId`, `patientName`, `birthYear` (số hoặc null), `sex` (male/female/unknown), `identityConfirmed: true`.
+- POST /api/admissions/{id}/call: body `{}`, gọi vào khám bằng hoàn tất bước chờ của BPMN.
+- GET /api/demo/referrals: mẫu giả lập, chỉ bật trong demo và sau xác thực bác sĩ.
+
+Các API nghiệp vụ yêu cầu Bearer token physician, JSON POST tối đa 4 KiB và không nhận định danh qua query. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
 
 ## Tra cứu chuyển tuyến
 
@@ -84,6 +89,40 @@ Chỉ cấu hình local thay đổi; không sửa mã Core hoặc hợp đồng 
 ### Kiểm thử end-to-end có chủ đích
 
 `npm run test:referrals:live` dùng Core local, tài khoản giả lập An và phiếu CT-2026-000123. Cần chưa có đồng thuận đang hiệu lực của An cho năng lực này. Script dùng helper PKCE của Core, kiểm tra từ chối trước đồng thuận, cấp đồng thuận tạm, lấy phiếu qua provider TLS thật, kiểm tra lỗi phiếu và thu hồi chính đồng thuận vừa tạo trong finally; sau đó xác nhận bị chặn trở lại. Không chạy trên hệ thống thật. Script không khởi động provider hoặc đổi cấu hình Core giúp bạn.
+
+## Tiếp nhận và hàng đợi (Issue #6)
+
+Sau khi xem phiếu, đối chiếu mã người bệnh/phiếu với người đang tiếp nhận, nhập họ tên và năm sinh/giới nếu biết, đánh dấu xác nhận rồi bấm **Xác nhận tiếp nhận**. Hospital tra cứu lại phiếu qua Core để kiểm tra đồng thuận còn hiệu lực và đúng bệnh viện nhận. Tên/giới/năm sinh do bệnh viện đối chiếu, không coi là dữ liệu trả về từ Clinic.
+
+Thông tin tối thiểu lưu trong collection app-private `hospital_admissions_v1` của Core; không sao chép chẩn đoán hoặc xử trí vào hàng đợi. Workflow `junctura_hospital_intake_v1` chỉ nhận một khóa lượt tiếp nhận không chứa định danh/họ tên. Quy trình: bắt đầu → chờ gọi vào khám → kết thúc khi gọi. **Đã gọi vào khám không có nghĩa đã khám xong.** Mức khẩn lấy từ phiếu, không thay thế phân loại lâm sàng.
+
+Trạng thái đọc từ Core mỗi lần làm mới. Không đọc được workflow thì đưa vào mục cần kiểm tra, không tự coi đang chờ. Gửi lại cùng người bệnh/phiếu trả lượt đã có; không tạo một lượt khám mới. Khi mất phản hồi ghi dữ liệu, Hospital đối chiếu lại trước khi thử tiếp. Thao tác gọi cũng có thể gửi lại an toàn.
+
+Phạm vi demo: một tiến trình ghi Hospital, tối đa 100 bản ghi. Chạm giới hạn thì chặn tiếp nhận mới. Core chưa cung cấp transaction chung giữa workflow và data; lỗi giữa hai bước có thể để lại workflow chưa gắn bản ghi, được tái sử dụng bằng cùng khóa khi gửi lại. Chưa cam kết chạy nhiều replica hoặc xử lý đồng thời từ nhiều writer.
+
+### Chuẩn bị quy trình và thử dễ hiểu
+
+Cần các điều kiện liên thông local ở trên, gồm provider Clinic HTTPS. Tại thư mục Hospital:
+
+```powershell
+npm run workflow:setup
+npm run demo:prepare
+npm run build
+npm run demo:start
+```
+
+Dừng tiến trình Hospital cũ nếu cổng 5182 đang dùng. Mở **http://localhost:5182**, đăng nhập `bacsi.benhvien` bằng mật khẩu trong file Health `accounts.env`.
+
+1. Vào **Tiếp nhận**, chọn **An — thử xem phiếu**, rồi **Tra cứu phiếu**: thấy phiếu thật từ provider giả lập.
+2. Đối chiếu thông tin giả lập đã điền, đánh dấu xác nhận → tiếp nhận → xem hàng đợi. Lượt mới có nút **Gọi vào khám**; bấm để chuyển sang **Đã gọi vào khám**.
+3. Tải lại trang: trạng thái vẫn còn. Tiếp nhận lại cùng phiếu trả thông báo đã có lượt, không nhân đôi. Nếu An đã được gọi từ lần thử trước, hệ thống giữ trạng thái đó, không tự tạo lượt chờ mới.
+4. Chọn mẫu **Đặng Minh Tài — thử thiếu đồng thuận**, tra cứu: thấy **Chưa có đồng thuận**, không thể tiếp nhận. Mẫu được lấy từ Health seed có phiếu thật; không dùng mã bất kỳ.
+
+`workflow:setup` là helper vận hành local: tái sử dụng client khởi tạo bên trong container Core để triển khai XML của Hospital. Chạy lại không tạo phiên bản mới; XML khác với bản đã triển khai sẽ bị chặn, cần khóa quy trình phiên bản mới. App runtime chỉ gọi API công khai của Core và không nhận mật khẩu Flowable.
+
+`demo:prepare` đăng nhập tài khoản bệnh nhân **giả lập** bằng helper PKCE sẵn có, kiểm tra ca thiếu đồng thuận và cấp cho An quyền referral-summary/referral_intake trong 24 giờ (hoặc dùng đồng thuận có sẵn). Nó không thu hồi quyền có sẵn. `npm run demo:clear` chỉ thu hồi đồng thuận do chính helper tạo. Chạy kiểm thử `test:referrals:live` trước `demo:prepare`, hoặc sau khi đã clear và An không còn đồng thuận khác. Không chạy các helper demo trên dữ liệu thật.
+
+`npm start` mặc định không có nút mẫu. `npm run demo:start` hoặc `HOSPITAL_DEMO=true` bật mẫu giả lập; bấm mẫu chỉ điền biểu mẫu, không cấp quyền. SDK client/secret và file trạng thái helper luôn nằm ở backend/thư mục bị gitignore. `JUNCTURA_DXOS_DIR` cho phép chỉ rõ vị trí Core cho các helper vận hành.
 
 ## Năng lực còn lại
 

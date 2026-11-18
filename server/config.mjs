@@ -27,6 +27,7 @@ export function loadConfig({ env = process.env, cwd = process.cwd() } = {}) {
   return Object.freeze({
     junctura: baseUrl && clientId && clientSecret ? Object.freeze({ baseUrl, clientId, clientSecret }) : null,
     referralProviderAppId: providerAppId,
+    appId: get("JUNCTURA_APP_ID"), healthDir, demoEnabled: get("HOSPITAL_DEMO") === "true",
     issuer, webClientId, port, host: get("HOST") ?? "127.0.0.1",
     issuerInternal: (get("JUNCTURA_ISSUER_INTERNAL") ?? issuer).replace(/\/+$/, ""),
     accountsFile: resolve(healthDir, "seed/data/accounts.json"),

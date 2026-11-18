@@ -1,6 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Junctura Contributors
 // SPDX-License-Identifier: Apache-2.0
 import { createJuncturaClient } from "@junctura/server-client";
+import { createAdmissions } from "./admissions.mjs";
+import { demoCases } from "./demo.mjs";
+import { readFileSync, existsSync } from "node:fs";
 import { createReferralLookup } from "./referrals.mjs";
 import { createServer } from "node:http";
 import { createApp } from "./app.mjs";
@@ -16,11 +19,15 @@ try {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error("--port requires a valid port.");
     config = Object.freeze({ ...config, port });
   }
+  if (process.argv.includes("--demo")) config = Object.freeze({ ...config, demoEnabled: true });
+  const subjects = existsSync(config.subjectsFile) ? JSON.parse(readFileSync(config.subjectsFile, "utf8")) : {};
+  const examples = config.demoEnabled ? demoCases(config.healthDir, subjects) : undefined;
   const staff = loadStaff(config);
   const verifier = createVerifier({ issuer: config.issuer, keysBase: config.issuerInternal, clientId: config.webClientId });
   const junctura = config.junctura ? createJuncturaClient({ ...config.junctura, timeoutMs: 5000 }) : null;
   const lookupReferral = createReferralLookup({ junctura, providerAppId: config.referralProviderAppId });
-  const server = createServer(createApp({ config, staff, verifier, lookupReferral }));
+  const admissions = createAdmissions({ junctura, appId: config.appId, facility: config.facility, lookupReferral });
+  const server = createServer(createApp({ config, staff, verifier, lookupReferral, admissions, examples }));
   server.on("error", error => { console.error(`Hospital could not start (${error.code ?? "server_error"}).`); process.exitCode = 1; });
   server.listen(config.port, config.host, () => console.log(`Junctura Hospital listening on http://${config.host}:${server.address().port}`));
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.close(() => process.exit(0)));

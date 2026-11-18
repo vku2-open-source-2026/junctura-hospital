@@ -26,7 +26,11 @@
     "check": "node scripts/check.mjs",
     "check:reuse": "node scripts/check-reuse.mjs",
     "test": "node --test \"tests/*.test.mjs\"",
-    "test:referrals:live": "node scripts/check-referral-live.mjs"
+    "test:referrals:live": "node scripts/check-referral-live.mjs",
+    "workflow:setup": "node scripts/setup-admission-workflow.mjs",
+    "demo:prepare": "node scripts/prepare-referral-demo.mjs",
+    "demo:clear": "node scripts/prepare-referral-demo.mjs --clear",
+    "demo:start": "node server/main.mjs --demo"
   },
   "dependencies": {
     "@junctura/health-contracts": "^1.1.0",

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- SPDX-FileCopyrightText: 2026 Junctura Contributors -->
+<!-- SPDX-License-Identifier: Apache-2.0 -->
+<definitions xmlns="http://www.omg.org/spec/BPMN/20100524/MODEL" targetNamespace="https://junctura.invalid/health/hospital">
+  <process id="junctura_hospital_intake_v1" name="Hospital: bàn giao vào khám" isExecutable="true">
+    <startEvent id="start" />
+    <sequenceFlow id="to_waiting" sourceRef="start" targetRef="waiting" />
+    <userTask id="waiting" name="Gọi người bệnh vào khám" />
+    <sequenceFlow id="to_called" sourceRef="waiting" targetRef="called" />
+    <endEvent id="called" name="Đã bàn giao vào khám" />
+  </process>
+</definitions>
