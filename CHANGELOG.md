@@ -1,8 +1,15 @@
-<!-- SPDX-FileCopyrightText: 2026 Junctura Contributors -->
+﻿<!-- SPDX-FileCopyrightText: 2026 Junctura Contributors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Changelog
 
 ## Unreleased
+
+- Issue #12: truy cập cấp cứu pre-visit-summary/allergy-list qua Core, lý do và xác nhận hai bước bằng Health UI.
+- Dải cấp cứu/định danh dính khi cuộn, nguồn/ngày/bốn trạng thái dị ứng; kết thúc/đổi màn bỏ hồ sơ, giới hạn xem 5 phút.
+- Chỉ mục yêu cầu gắn bác sĩ với execution trên Core, idempotency và đối chiếu mất phản hồi; lịch sử không trả nội dung y tế.
+- Giữ quyền hậu kiểm tại Core, xử lý giới hạn 5 lần chờ; không tự cấp quyền, duyệt hoặc xóa review.
+- Ca demo Bình chưa đồng thuận, kiểm thử live chỉ đọc nhật ký dưới danh tính Bình, giữ mục chờ để quản trị viên rà soát.
+
 
 - Issue #10: kê đơn từ ghi nhận khám, gọi allergy-list với treatment và kiểm tra lại trước phát hành.
 - Bốn trạng thái dị ứng, cảnh báo có lý do/xác nhận riêng, bỏ kết quả khi đổi nội dung đơn; không tự điền liều/cách dùng.

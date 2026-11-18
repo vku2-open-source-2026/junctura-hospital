@@ -39,7 +39,8 @@
     "demo:pharmacy:clear": "node scripts/prepare-referral-demo.mjs --pharmacy --clear",
     "demo:provider:up": "node scripts/provider-demo.mjs",
     "demo:provider:down": "node scripts/provider-demo.mjs --down",
-    "test:prescriptions:live": "node scripts/check-prescriptions-live.mjs"
+    "test:prescriptions:live": "node scripts/check-prescriptions-live.mjs",
+    "test:emergency:live": "node scripts/check-emergency-live.mjs"
   },
   "dependencies": {
     "@junctura/health-contracts": "^1.1.0",

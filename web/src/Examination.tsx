@@ -75,11 +75,12 @@ export function ExaminationFailure({ error }: { error: unknown }) {
 export function Examination({
   settings,
   initialId,
-  onQueue, onPrescribe,
+  onQueue, onPrescribe, onEmergency,
 }: {
   settings: OidcSettings;
   initialId?: string | null;
   onQueue: () => void;
+  onEmergency?: (subject:string)=>void;
   onPrescribe?: (admissionId:string,noteId:string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(initialId ?? null);
@@ -106,6 +107,7 @@ export function Examination({
         key={selected}
         settings={settings}
         admissionId={selected}
+        onEmergency={onEmergency}
         onPrescribe={onPrescribe}
         onBack={() => {
           setSelected(null);
@@ -158,11 +160,12 @@ export function Examination({
 function ExamPatient({
   settings,
   admissionId,
-  onBack, onPrescribe,
+  onBack, onPrescribe, onEmergency,
 }: {
   settings: OidcSettings;
   admissionId: string;
   onBack: () => void;
+  onEmergency?: (subject:string)=>void;
   onPrescribe?: (admissionId:string,noteId:string) => void;
 }) {
   const [value, setValue] = useState<ExaminationResult | null>(null);
@@ -274,7 +277,7 @@ function ExamPatient({
                   : "Tải tóm tắt trước khám"}
             </Button>
             {loading && <Skeleton lines={5} />}
-            {summaryError ? <ExaminationFailure error={summaryError} /> : null}
+            {summaryError ? <><ExaminationFailure error={summaryError} />{onEmergency && summaryError instanceof ApiError && summaryError.code === "treatment_consent_required" && <Button variant="secondary" onClick={() => onEmergency(value.admission.patientSubject)}>Mở luồng cấp cứu có lý do</Button>}</> : null}
             {!summary && !loading && !summaryError && (
               <p className="text-sm text-muted">
                 Chưa tải dữ liệu từ trạm. Không thể kết luận người bệnh không có
@@ -349,10 +352,11 @@ function ExamPatient({
 }
 export function SummaryDetails({
   value,
-  admission,
+  admission, identityOrigin = "hospital",
 }: {
   value: SummaryResult;
-  admission: Admission;
+  admission: Pick<Admission,"patientName"|"birthYear"|"sex">;
+  identityOrigin?: "hospital"|"clinic";
 }) {
   const data = value.summary;
   const mismatch =
@@ -369,10 +373,10 @@ export function SummaryDetails({
       <StaleNotice updatedAt={data.updatedAt} maxAgeDays={90} />
       <p className="text-sm text-muted">
         Định danh tại trạm: {data.patientName} · sinh {data.birthYear} ·{" "}
-        {{ male: "Nam", female: "Nữ", other: "Khác" }[data.sex] ?? "Chưa rõ"}.
-        Thanh định danh phía trên giữ thông tin bệnh viện đã đối chiếu.
+        {{ male: "Nam", female: "Nữ", other: "Khác" }[data.sex] ?? "Chưa rõ"}.{" "}
+        {identityOrigin === "hospital" ? "Thanh định danh phía trên giữ thông tin bệnh viện đã đối chiếu." : "Định danh và dữ liệu do trạm cung cấp qua Junctura."}
       </p>
-      {mismatch && (
+      {identityOrigin === "hospital" && mismatch && (
         <AlertBanner level="warning" title="Thông tin định danh khác nhau">
           Thông tin từ trạm khác thông tin đã đối chiếu tại bệnh viện. Kiểm tra
           đúng người bệnh trước khi sử dụng dữ liệu.

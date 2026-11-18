@@ -7,7 +7,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
   return <LandingPage product="Hospital" badge="Bệnh viện · Bản demo"
     headline="Kết nối thông tin, tiếp nối chăm sóc"
     lead="Không gian làm việc dành cho bác sĩ và nhân viên tiếp nhận trong hệ sinh thái Junctura Health."
-    note="Đã có đăng nhập, tiếp nhận chuyển tuyến và hàng đợi qua Junctura. Đã có xem tóm tắt trước khám, ghi nhận khám và kê đơn có kiểm tra dị ứng. Cấp cứu và chi phí đang được xây dựng. Chỉ dùng dữ liệu giả lập."
+    note="Đã có đăng nhập, tiếp nhận chuyển tuyến và hàng đợi qua Junctura. Đã có xem tóm tắt trước khám, ghi nhận khám và kê đơn có kiểm tra dị ứng. Đã có truy cập dữ liệu cấp cứu có lý do; chi phí đang được xây dựng. Chỉ dùng dữ liệu giả lập."
     onSignIn={onSignIn}
     hero={<PreviewFrame label="Các bước dự kiến của Hospital" title="Hospital · Hướng phát triển">
       <div className="space-y-4"><Badge>Đang xây dựng</Badge>
@@ -22,7 +22,7 @@ export function Landing({ onSignIn }: { onSignIn: () => void }) {
     steps={{ title: "Kết nối qua nền tảng chung", items: [
       { title: "Đăng nhập Junctura", text: "Mật khẩu chỉ nhập trên trang định danh Junctura." },
       { title: "Kiểm tra quyền Hospital", text: "Máy chủ chỉ cho tài khoản bác sĩ đã được cấu hình vào không gian làm việc." },
-      { title: "Phát triển nghiệp vụ từng bước", text: "Tiếp nhận, ghi nhận khám và kê đơn đã có; cấp cứu và chi phí sẽ được bổ sung theo các Issue riêng." },
+      { title: "Phát triển nghiệp vụ từng bước", text: "Tiếp nhận, ghi nhận khám, kê đơn và truy cập cấp cứu đã có; chi phí sẽ được bổ sung theo Issue riêng." },
     ] }}
     audiences={{ title: "Dành cho đội ngũ bệnh viện", items: [
       { title: "Bác sĩ", text: "Theo dõi người bệnh trong ca khám, biết dữ liệu đến từ đâu." },
