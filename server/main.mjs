@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Junctura Contributors
 // SPDX-License-Identifier: Apache-2.0
 import { createJuncturaClient } from "@junctura/server-client";
+import { createExaminations } from "./examinations.mjs";
+import { createPrevisitLookup } from "./previsit.mjs";
 import { createAdmissions } from "./admissions.mjs";
 import { demoCases } from "./demo.mjs";
 import { readFileSync, existsSync } from "node:fs";
@@ -27,7 +29,8 @@ try {
   const junctura = config.junctura ? createJuncturaClient({ ...config.junctura, timeoutMs: 5000 }) : null;
   const lookupReferral = createReferralLookup({ junctura, providerAppId: config.referralProviderAppId });
   const admissions = createAdmissions({ junctura, appId: config.appId, facility: config.facility, lookupReferral });
-  const server = createServer(createApp({ config, staff, verifier, lookupReferral, admissions, examples }));
+  const examinations = createExaminations({ junctura, admissions, lookupSummary: createPrevisitLookup({ junctura, providerAppId: config.referralProviderAppId }) });
+  const server = createServer(createApp({ config, staff, verifier, lookupReferral, admissions, examinations, examples }));
   server.on("error", error => { console.error(`Hospital could not start (${error.code ?? "server_error"}).`); process.exitCode = 1; });
   server.listen(config.port, config.host, () => console.log(`Junctura Hospital listening on http://${config.host}:${server.address().port}`));
   for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.close(() => process.exit(0)));

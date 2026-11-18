@@ -70,6 +70,7 @@ export function createAdmissions({ junctura, appId, facility, lookupReferral }) 
     catch (error) { if (error.status === 404) throw new AdmissionError(404, "admission_not_found"); throw error; }
   }
   return {
+    get: id => guard(async () => view(await ownRecord(id))),
     list: () => guard(async () => {
       const { rows, atCapacity } = await records(); const items = [];
       // Bounded batches protect the Core engine from a 100-request burst.

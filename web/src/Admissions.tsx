@@ -54,7 +54,7 @@ export function AdmissionForm({ settings, result, suggested, onShowQueue }: { se
     {error ? <AdmissionFailure error={error} /> : null}
   </Section>;
 }
-export function HospitalQueue({ settings, onIntake }: { settings: OidcSettings; onIntake: () => void }) {
+export function HospitalQueue({ settings, onIntake, onExamine }: { settings: OidcSettings; onIntake: () => void; onExamine?: (id: string) => void }) {
   const [items, setItems] = useState<Admission[] | null>(null);
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
@@ -90,7 +90,7 @@ export function HospitalQueue({ settings, onIntake }: { settings: OidcSettings; 
     {items && items.length > 0 && <>
       <Section title="Đang chờ gọi vào khám" count={waiting.length}><QueueList label="Người bệnh đang chờ" items={rows(waiting)}
         onCall={!busy && !error ? row => { const item = waiting.find(value => value.id === row.id); if (item) void call(item); } : undefined} callLabel="Gọi vào khám" /></Section>
-      <Section title="Đã gọi vào khám" count={called.length}><QueueList label="Người bệnh đã được gọi" items={rows(called)} /></Section>
+      <Section title="Đã gọi vào khám" count={called.length}><QueueList label="Người bệnh đã được gọi" items={rows(called)} onOpen={onExamine ? row => onExamine(row.id) : undefined} openLabel="Mở khám" /></Section>
       {other.length > 0 && <Section title="Cần kiểm tra trạng thái"><QueueList label="Lượt cần kiểm tra" items={rows(other)} /><p className="text-sm text-muted">Các lượt đã hủy hoặc chưa đọc được workflow không được tự coi là đang chờ. Làm mới hoặc liên hệ quản trị viên.</p></Section>}
     </>}
     {capacity && <AlertBanner level="notice" title="Đã chạm giới hạn demo">Chỉ đọc tối đa 100 bản ghi; hệ thống chặn tiếp nhận mới để không bỏ sót dữ liệu phía sau giới hạn này.</AlertBanner>}
