@@ -4,7 +4,7 @@ import { freshAccessToken, type OidcSettings } from "./auth";
 export interface Config { issuer: string; clientId: string; product: string; facility: string; demoEnabled?: boolean }
 export interface Me { subject: string; username: string; displayName: string; role: string; permissions: string[] }
 export class ApiError extends Error {
-  constructor(public status: number, public code = "request_failed") { super("Hospital request failed"); }
+  constructor(public status: number, public code = "request_failed", public check?: RxCheck) { super("Hospital request failed"); }
 }
 export async function getConfig(): Promise<Config> {
   const response = await fetch("/api/config", { signal: AbortSignal.timeout(10000) });
@@ -51,7 +51,7 @@ async function hospitalRequest<T>(settings: OidcSettings, path: string, body?: u
     Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }),
   }, body: body === undefined ? undefined : JSON.stringify(body), signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(35000)]) : AbortSignal.timeout(35000) });
   const value = await response.json();
-  if (!response.ok) throw new ApiError(response.status, value.error ?? "request_failed");
+  if (!response.ok) throw new ApiError(response.status, value.error ?? "request_failed", value.check);
   return value;
 }
 export const listAdmissions = (settings: OidcSettings, signal?: AbortSignal) => hospitalRequest<{items: Admission[]; atCapacity: boolean; limit: number}>(settings, "/api/admissions", undefined, signal);
@@ -73,3 +73,14 @@ export interface ExaminationResult {admission:Admission;notes:ExamNote[];atCapac
 export const openExamination=(settings:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<ExaminationResult>(settings,"/api/examinations/open",{admissionId},signal);
 export const getPrevisit=(settings:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<SummaryResult>(settings,"/api/examinations/summary",{admissionId},signal);
 export const saveExamNote=(settings:OidcSettings,input:NoteInput,signal?:AbortSignal)=>hospitalRequest<{note:ExamNote;created:boolean}>(settings,"/api/examinations/notes",input,signal);
+
+export interface RxItem {name:string;strength:string;quantity:number;instructions:string}
+export interface Prescription {id:string;requestId:string;admissionId:string;noteId:string;patientSubject:string;patientName:string;birthYear:number|null;sex:string;prescriptionCode:string;issuedAt:string;expiresAt:string;items:RxItem[];createdBy:{subject:string;displayName:string};dispensed:boolean;expired:boolean}
+export interface RxDraft {admissionId:string;noteId:string;items:RxItem[];validDays:number}
+export interface RxIssue extends RxDraft {requestId:string;reviewConfirmed:boolean;overrideReason:string}
+export interface RxCheck {patientSubject:string;source:string;executionId:string;checkedAt:string;allergy:Pick<PrevisitSummary,"allergyState"|"allergies"|"updatedAt">;conflicts:{medicine:string;allergen:string;severity:string}[];stale:boolean;reviewRequired:boolean}
+export interface RxWorkspace extends ExaminationResult {prescriptions:Prescription[];catalog:{name:string;strength:string}[]}
+export const listPrescriptions=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<{items:Prescription[];atCapacity:boolean}>(s,"/api/prescriptions",undefined,signal);
+export const openPrescriptions=(s:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<RxWorkspace>(s,"/api/prescriptions/open",{admissionId},signal);
+export const checkPrescription=(s:OidcSettings,input:RxDraft,signal?:AbortSignal)=>hospitalRequest<RxCheck>(s,"/api/prescriptions/check",input,signal);
+export const issuePrescription=(s:OidcSettings,input:RxIssue,signal?:AbortSignal)=>hospitalRequest<{prescription:Prescription;created:boolean}>(s,"/api/prescriptions/issue",input,signal);

@@ -56,7 +56,9 @@ export function createPrevisitLookup({
   junctura,
   providerAppId,
   now = () => new Date(),
+  slug = "pre-visit-summary",
 }) {
+  const contract = getContract(slug);
   return async (patientSubject, signal) => {
     if (!uuid.test(patientSubject ?? ""))
       throw new ExaminationError(400, "invalid_examination");
@@ -121,7 +123,7 @@ export function createPrevisitLookup({
         throw new ExaminationError(504, "summary_timeout");
       if (result.state !== "succeeded")
         throw new ExaminationError(502, "summary_provider_failed");
-      if (!validSummary(result.output))
+      if (!(slug === "allergy-list" ? validAllergies(result.output) : validSummary(result.output)))
         throw new ExaminationError(502, "invalid_summary");
       return {
         patientSubject,
@@ -141,3 +143,12 @@ export function createPrevisitLookup({
     }
   };
 }
+
+export function validAllergies(output) {
+ return !validateValue(getContract("allergy-list").outputSchema,output).length &&
+ Number.isFinite(Date.parse(output.updatedAt)) && dateOnly(output.updatedAt.slice(0,10)) && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?Z$/.test(output.updatedAt) &&
+ ["recorded","none-known","not-recorded"].includes(output.allergyState) &&
+ (output.allergyState==="recorded" ? output.allergies.length>0 : output.allergies.length===0) &&
+ output.allergies.every(item=>item.substance.trim() && ["mild","moderate","severe"].includes(item.severity));
+}
+export const createAllergyLookup = options => createPrevisitLookup({...options,slug:"allergy-list"});

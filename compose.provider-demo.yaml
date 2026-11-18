@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: 2026 Junctura Contributors
+# SPDX-License-Identifier: Apache-2.0
+# Optional local provider only. No host ports, private PKI verification, data stays in Core.
+name: hospital-prescription-demo
+services:
+  provider:
+    image: junctura-core:local
+    working_dir: /hospital
+    command: ["node", "scripts/provider-container.mjs"]
+    env_file:
+      - ${JUNCTURA_HEALTH_DIR:-../junctura-health}/.junctura/demo/junctura-hospital.env
+    environment:
+      JUNCTURA_URL: http://127.0.0.1:8080
+      JUNCTURA_HEALTH_DIR: /health
+      JUNCTURA_PHARMACY_APP_ID: ${JUNCTURA_PHARMACY_APP_ID:?Use npm run demo:provider:up}
+      PROVIDER_TLS_CERT: /pki/hospital.provider.internal.crt
+      PROVIDER_TLS_KEY: /pki/hospital.provider.internal.key
+      PROVIDER_BIND: 0.0.0.0
+      PROVIDER_PORT: 8443
+    volumes:
+      - ./server:/hospital/server:ro
+      - ./node_modules:/hospital/node_modules:ro
+      - ./scripts/provider-container.mjs:/hospital/scripts/provider-container.mjs:ro
+      - ${JUNCTURA_HEALTH_DIR:-../junctura-health}/seed:/health/seed:ro
+      - ${JUNCTURA_DXOS_DIR:-../junctura-dxos}/.junctura/pki/hospital.provider.internal.crt:/pki/hospital.provider.internal.crt:ro
+      - ${JUNCTURA_DXOS_DIR:-../junctura-dxos}/.junctura/pki/hospital.provider.internal.key:/pki/hospital.provider.internal.key:ro
+      - ${JUNCTURA_DXOS_DIR:-../junctura-dxos}/.junctura/pki/ca.crt:/pki/ca.crt:ro
+    networks:
+      edge: {}
+      providers:
+        aliases: [hospital.provider.internal]
+    healthcheck:
+      test: ["CMD", "node", "--input-type=module", "-e", "import https from 'node:https'; import fs from 'node:fs'; const r=https.get('https://hospital.provider.internal:8443/capabilities/prescription-verify',{ca:fs.readFileSync('/pki/ca.crt'),timeout:2000},s=>{s.resume();process.exit(s.statusCode===405?0:1);}); r.on('error',()=>process.exit(1)); r.on('timeout',()=>{r.destroy();process.exit(1);});"]
+      interval: 10s
+      timeout: 4s
+      retries: 6
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+networks:
+  edge:
+    external: true
+    name: ${JUNCTURA_EDGE_NETWORK:-junctura_edge}
+  providers:
+    external: true
+    name: ${JUNCTURA_PROVIDERS_NETWORK:-junctura_providers}

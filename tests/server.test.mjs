@@ -23,7 +23,7 @@ async function fixture(t, options = {}) {
   writeFileSync(join(dir, "index.html"), "<html lang='vi'>Hospital shell</html>");
   const config = { issuer: ISSUER, webClientId: CLIENT, facility: "Bệnh viện thử nghiệm", staticDir: dir, clientSecret: "never-public", demoEnabled: options.demoEnabled };
   const verifier = options.verifier ?? createVerifier({ issuer: ISSUER, clientId: CLIENT, getJson: async () => ({ keys: [signer.jwk] }) });
-  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral, admissions: options.admissions, examinations: options.examinations, examples: options.examples }));
+  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral, admissions: options.admissions, examinations: options.examinations, prescriptions: options.prescriptions, examples: options.examples }));
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -147,3 +147,6 @@ test("examination routes authenticate first and pass only verified physician ide
   assert.equal((await request("/api/examinations/notes",{},init)).status,201);
   assert.equal(calls[2][2].subject,"doctor-subject");
 });
+
+
+test("prescription API authenticates physician and attaches the verified prescriber",async t=>{const calls=[];const {request}=await fixture(t,{prescriptions:{list:async()=>({items:[]}),open:async()=>({}),check:async()=>({}),issue:async(body,actor)=>{calls.push(actor);return {created:true};}}});const init={method:"POST",headers:{"content-type":"application/json"},body:"{}"};for(const action of ["open","check","issue"]){const path=`/api/prescriptions/${action}`;assert.equal((await request(path,null,init)).status,401);assert.equal((await request(path,{sub:"insurance-subject",preferred_username:"giamdinh.baohiem"},init)).status,403);assert.equal((await request(path,{})).status,405);assert.equal((await request(path+"?patient=private",{},init)).status,400);}assert.equal(calls.length,0);assert.equal((await request("/api/prescriptions/issue",{}, {...init,body:"x".repeat(32769)})).status,413);assert.equal((await request("/api/prescriptions/issue",{},init)).status,201);assert.equal(calls[0].subject,"doctor-subject");assert.equal((await request("/api/prescriptions",{})).status,200);});

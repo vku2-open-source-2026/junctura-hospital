@@ -75,11 +75,12 @@ export function ExaminationFailure({ error }: { error: unknown }) {
 export function Examination({
   settings,
   initialId,
-  onQueue,
+  onQueue, onPrescribe,
 }: {
   settings: OidcSettings;
   initialId?: string | null;
   onQueue: () => void;
+  onPrescribe?: (admissionId:string,noteId:string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(initialId ?? null);
   const [items, setItems] = useState<Admission[] | null>(null);
@@ -105,6 +106,7 @@ export function Examination({
         key={selected}
         settings={settings}
         admissionId={selected}
+        onPrescribe={onPrescribe}
         onBack={() => {
           setSelected(null);
           setRefresh((value) => value + 1);
@@ -156,11 +158,12 @@ export function Examination({
 function ExamPatient({
   settings,
   admissionId,
-  onBack,
+  onBack, onPrescribe,
 }: {
   settings: OidcSettings;
   admissionId: string;
   onBack: () => void;
+  onPrescribe?: (admissionId:string,noteId:string) => void;
 }) {
   const [value, setValue] = useState<ExaminationResult | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -316,7 +319,7 @@ function ExamPatient({
                   time: note.createdAt,
                   title: `${note.createdBy.displayName} · ${note.diagnosis.name}`,
                   description: (
-                    <dl className="space-y-2 whitespace-pre-wrap break-words">
+                    <><dl className="space-y-2 whitespace-pre-wrap break-words">
                       {[
                         ["Lý do khám", note.reason],
                         ["Khám và ghi nhận", note.findings],
@@ -333,7 +336,7 @@ function ExamPatient({
                           <dd>{text}</dd>
                         </div>
                       ))}
-                    </dl>
+                    </dl>{onPrescribe && <Button variant="secondary" onClick={() => onPrescribe(admissionId,note.id)}>Kê đơn từ ghi nhận này</Button>}</>
                   ),
                 }))}
               />
