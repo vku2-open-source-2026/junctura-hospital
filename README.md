@@ -4,7 +4,7 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có thao tác gọi vào khám; chưa triển khai khám, kê đơn, cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); chưa có kê đơn, cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
@@ -66,7 +66,7 @@ Biến môi trường ưu tiên hơn file env của Health. `.env` tại Hospita
 - POST /api/admissions/{id}/call: body `{}`, gọi vào khám bằng hoàn tất bước chờ của BPMN.
 - GET /api/demo/referrals: mẫu giả lập, chỉ bật trong demo và sau xác thực bác sĩ.
 
-Các API nghiệp vụ yêu cầu Bearer token physician, JSON POST tối đa 4 KiB và không nhận định danh qua query. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
+Các API nghiệp vụ yêu cầu Bearer token physician và không nhận định danh qua query. JSON POST giới hạn 4 KiB; riêng API khám giới hạn 16 KiB. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
 
 ## Tra cứu chuyển tuyến
 
@@ -124,9 +124,39 @@ Dừng tiến trình Hospital cũ nếu cổng 5182 đang dùng. Mở **http://l
 
 `npm start` mặc định không có nút mẫu. `npm run demo:start` hoặc `HOSPITAL_DEMO=true` bật mẫu giả lập; bấm mẫu chỉ điền biểu mẫu, không cấp quyền. SDK client/secret và file trạng thái helper luôn nằm ở backend/thư mục bị gitignore. `JUNCTURA_DXOS_DIR` cho phép chỉ rõ vị trí Core cho các helper vận hành.
 
+## Khám và ghi nhận tại bệnh viện (Issue #8)
+
+Từ **Hàng đợi → Đã gọi vào khám → Mở khám**, hoặc tab **Khám** chọn người bệnh. Backend đọc lại lượt từ Core và chỉ cho mở/lưu khi workflow ở trạng thái đã gọi. Trình duyệt chỉ gửi mã lượt; mã người bệnh dùng để gọi Clinic do server lấy từ bản ghi Hospital, không nhận từ client.
+
+Bấm **Tải tóm tắt trước khám** để gọi `pre-visit-summary` đúng phiên bản/digest Health qua Core, input `{}`, context `{ purpose: "treatment", dataSubject }`. Không tự tải khi mở lượt. Hiển thị tên nguồn, ngày cập nhật, bệnh mạn tính, thuốc đang dùng, tối đa ba lần khám và bốn trạng thái dị ứng; dị ứng nặng được nêu riêng. Ngày khám từ trạm chỉ có ngày thì không tự thêm giờ. Định danh từ trạm khác thông tin Hospital đã đối chiếu sẽ có cảnh báo, không tự thay thế định danh Hospital.
+
+Đồng thuận xem phiếu `referral_intake` **không** thay cho đồng thuận điều trị. Thiếu quyền hiện trạng thái riêng; không biến dữ liệu bị chặn thành “không có dị ứng”. Tải lại xóa snapshot cũ trước khi gọi; đổi người bệnh xóa ngữ cảnh và bỏ phản hồi muộn. Dữ liệu đã nhận là snapshot tại lần tải, không phải cơ chế theo dõi thay đổi đồng thuận nền. Không lưu snapshot Clinic vào Core, localStorage hoặc sessionStorage; dữ liệu hiển thị chỉ ở bộ nhớ màn hình.
+
+**Ghi khám tại bệnh viện** gồm lý do, khám/ghi nhận, mã ICD-10 nếu đã đối chiếu, chẩn đoán/nhận định do bác sĩ nhập và xử trí/kế hoạch. Không tự đề xuất chẩn đoán hay thuốc; chưa có danh mục ICD-10 tra cứu. Bác sĩ xác nhận đã kiểm tra trước khi lưu. Dữ liệu lưu vào Core app-private collection `hospital_exam_notes_v1`, giữ subject/người ghi/thời điểm Core tạo. Mỗi bản đã lưu giữ nguyên; bổ sung bằng bản mới, chưa có chức năng sửa/xóa ghi nhận. Có thể ghi khám tại chỗ khi chưa xem được hồ sơ trạm; đó không phải đường vượt quyền xem dữ liệu trạm.
+
+Lưu dùng request UUID cố định cho một lần thao tác. Mất phản hồi thì giữ nội dung, khóa ô nhập và cho **Kiểm tra kết quả lưu** hoặc thử lại cùng nội dung/mã. Không tự đổi mã để ghi lại. Bản nhập chưa lưu chỉ nằm trong bộ nhớ màn hình và mất khi chuyển màn/tải lại; không có tự lưu nháp. Sau tải lại, kiểm tra lịch sử trước khi nhập lại nếu kết quả lần lưu trước chưa rõ.
+
+Giới hạn demo: một writer Hospital, tối đa 100 ghi nhận cho toàn ứng dụng; chỉ đọc collection trong giới hạn và chặn ghi mới khi đầy. Không cam kết exactly-once giữa nhiều replica hoặc request bị treo ở Core; bản cùng request được đối chiếu/gộp khi đọc. Không có ghi đè bản cũ. Ghi nhận khám chưa đổi hàng đợi thành “đã khám xong”, chưa kết thúc đợt điều trị hoặc kê đơn.
+
+### Thử phần Khám với An
+
+Sau khi Core, provider Clinic và Hospital hoạt động, An đã được tiếp nhận/gọi vào khám:
+
+1. Vào **Khám → Mở khám → Tải tóm tắt trước khám**. Nếu An chỉ có quyền xem phiếu, thấy **Chưa có đồng thuận điều trị**.
+2. Trong terminal Hospital chạy `npm run demo:exam:prepare`. Helper dành cho tài khoản **giả lập** cấp quyền `pre-visit-summary`/`treatment` trong 24 giờ (hoặc dùng quyền có sẵn); không sửa đồng thuận phiếu chuyển tuyến.
+3. Bấm tải lại tóm tắt: thấy dữ liệu của An và dị ứng Penicillin nặng. Nhập ghi nhận giả lập, đánh dấu xác nhận rồi **Lưu ghi nhận khám**.
+4. Đổi tab hoặc tải lại trang, mở lại An: ghi nhận đã lưu vẫn còn cùng tên bác sĩ và thời điểm. Tóm tắt từ trạm cần bấm tải lại.
+5. `npm run demo:exam:clear` chỉ thu hồi quyền điều trị do helper này tạo; tải lại tóm tắt bị chặn nếu không có quyền điều trị khác. Không thu hồi quyền có sẵn do người dùng cấp.
+
+API mới (POST JSON, physician):
+
+- `/api/examinations/open` — `{ admissionId }`, trả lượt và ghi nhận thuộc lượt đó.
+- `/api/examinations/summary` — `{ admissionId }`, đọc tóm tắt qua Core với mục đích điều trị.
+- `/api/examinations/notes` — `{ admissionId, requestId, reason, findings, diagnosis: { code, name }, plan }`, trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu. Server gắn bác sĩ từ token đã xác minh.
+
 ## Năng lực còn lại
 
-Đã gọi `referral-summary`; các năng lực `pre-visit-summary`, `allergy-list`, `vaccination-history`, `prescription-verify` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
+Đã gọi `referral-summary` và `pre-visit-summary`; các năng lực `allergy-list`, `vaccination-history`, `prescription-verify` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
 
 ## Kiểm thử và giấy phép
 

@@ -58,3 +58,18 @@ export const listAdmissions = (settings: OidcSettings, signal?: AbortSignal) => 
 export const confirmAdmission = (settings: OidcSettings, input: IdentityInput & {patientSubject: string; referralId: string}, signal?: AbortSignal) => hospitalRequest<{admission: Admission; created: boolean}>(settings, "/api/admissions", input, signal);
 export const callAdmission = (settings: OidcSettings, id: string) => hospitalRequest<{admission: Admission}>(settings, `/api/admissions/${encodeURIComponent(id)}/call`, {});
 export const getDemoCases = (settings: OidcSettings, signal?: AbortSignal) => hospitalRequest<{items: DemoCase[]}>(settings, "/api/demo/referrals", undefined, signal);
+
+export interface PrevisitSummary {
+  patientName: string; birthYear: number; sex: string; allergyState: "recorded" | "none-known" | "not-recorded";
+  allergies: {substance:string;severity:"mild"|"moderate"|"severe";reaction:string}[];
+  chronicConditions: {code:string;name:string;since:string}[];
+  currentMedications: {name:string;dose:string;since:string}[];
+  recentEncounters: {date:string;reason:string;diagnosis:{code:string;name:string}}[]; updatedAt:string;
+}
+export interface SummaryResult { admissionId:string;patientSubject:string;executionId:string;receivedAt:string;source:string;summary:PrevisitSummary }
+export interface NoteInput { admissionId:string;requestId:string;reason:string;findings:string;diagnosis:{code:string;name:string};plan:string }
+export interface ExamNote extends NoteInput {id:string;createdAt:string;createdBy:{subject:string;displayName:string}}
+export interface ExaminationResult {admission:Admission;notes:ExamNote[];atCapacity:boolean}
+export const openExamination=(settings:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<ExaminationResult>(settings,"/api/examinations/open",{admissionId},signal);
+export const getPrevisit=(settings:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<SummaryResult>(settings,"/api/examinations/summary",{admissionId},signal);
+export const saveExamNote=(settings:OidcSettings,input:NoteInput,signal?:AbortSignal)=>hospitalRequest<{note:ExamNote;created:boolean}>(settings,"/api/examinations/notes",input,signal);

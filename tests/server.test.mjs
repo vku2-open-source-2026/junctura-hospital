@@ -23,7 +23,7 @@ async function fixture(t, options = {}) {
   writeFileSync(join(dir, "index.html"), "<html lang='vi'>Hospital shell</html>");
   const config = { issuer: ISSUER, webClientId: CLIENT, facility: "Bệnh viện thử nghiệm", staticDir: dir, clientSecret: "never-public", demoEnabled: options.demoEnabled };
   const verifier = options.verifier ?? createVerifier({ issuer: ISSUER, clientId: CLIENT, getJson: async () => ({ keys: [signer.jwk] }) });
-  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral, admissions: options.admissions, examples: options.examples }));
+  const server = createServer(createApp({ config, staff: buildStaff(accounts), verifier, lookupReferral: options.lookupReferral, admissions: options.admissions, examinations: options.examinations, examples: options.examples }));
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   t.after(async () => { await new Promise(resolve => server.close(resolve)); rmSync(dir, { recursive: true, force: true }); });
   const base = `http://127.0.0.1:${server.address().port}`;
@@ -127,4 +127,23 @@ test("synthetic demo examples are opt-in and authenticated", async t => {
   const enabled = await fixture(t, { demoEnabled: true, examples: [{ referralId: "DEMO" }] });
   assert.equal((await enabled.request("/api/demo/referrals", null)).status, 401);
   assert.deepEqual(await (await enabled.request("/api/demo/referrals", {})).json(), { items: [{ referralId: "DEMO" }] });
+});
+
+
+test("examination routes authenticate first and pass only verified physician identity", async t => {
+  const calls=[];
+  const { request }=await fixture(t,{examinations:{open:async body=>{calls.push(["open",body]);return {notes:[]};},summary:async body=>{calls.push(["summary",body]);return {};},save:async(body,actor)=>{calls.push(["save",body,actor]);return {created:true};}}});
+  const init={method:"POST",headers:{"content-type":"application/json"},body:"{}"};
+  for(const action of ["open","summary","notes"]){const path=`/api/examinations/${action}`;
+    assert.equal((await request(path,null,init)).status,401);
+    assert.equal((await request(path,{sub:"insurance-subject",preferred_username:"giamdinh.baohiem"},init)).status,403);
+    assert.equal((await request(path,{})).status,405);
+    assert.equal((await request(path+"?patient=private",{},init)).status,400);
+    assert.equal((await request(path,{}, {...init,body:"x".repeat(16385)})).status,413);
+  }
+  assert.equal(calls.length,0);
+  assert.equal((await request("/api/examinations/open",{},init)).status,200);
+  assert.equal((await request("/api/examinations/summary",{},init)).status,200);
+  assert.equal((await request("/api/examinations/notes",{},init)).status,201);
+  assert.equal(calls[2][2].subject,"doctor-subject");
 });

@@ -30,7 +30,9 @@
     "workflow:setup": "node scripts/setup-admission-workflow.mjs",
     "demo:prepare": "node scripts/prepare-referral-demo.mjs",
     "demo:clear": "node scripts/prepare-referral-demo.mjs --clear",
-    "demo:start": "node server/main.mjs --demo"
+    "demo:start": "node server/main.mjs --demo",
+    "demo:exam:prepare": "node scripts/prepare-referral-demo.mjs --treatment",
+    "demo:exam:clear": "node scripts/prepare-referral-demo.mjs --treatment --clear"
   },
   "dependencies": {
     "@junctura/health-contracts": "^1.1.0",
