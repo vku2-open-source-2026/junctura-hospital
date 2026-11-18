@@ -23,7 +23,7 @@ try {
     !existsSync(
       resolve(core, ".junctura/pki/hospital.provider.internal.crt"),
     ) ||
-    !c.pharmacyAppId
+    (!c.pharmacyAppId || !c.insuranceAppId)
   )
     throw Error(
       "Prepare hospital provider PKI in Core and Health demo apps first",
@@ -46,6 +46,7 @@ try {
         JUNCTURA_HEALTH_DIR: c.healthDir,
         JUNCTURA_DXOS_DIR: core,
         JUNCTURA_PHARMACY_APP_ID: c.pharmacyAppId,
+        JUNCTURA_INSURANCE_APP_ID: c.insuranceAppId,
       },
     },
   );

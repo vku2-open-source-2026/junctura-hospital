@@ -5,6 +5,7 @@ import { ClipboardList, FileInput, Pill, Receipt, ScrollText, ShieldAlert, Steth
 import { useEffect, useState } from "react";
 import { ApiError, getConfig, getMe, type Config, type Me } from "./api";
 import { buildLogoutUrl, clearSession, completeLogin, loadSession, startLogin } from "./auth";
+import { Costs } from "./Costs";
 import { Emergency } from "./Emergency";
 import { Prescriptions } from "./Prescriptions";
 import { Examination } from "./Examination";
@@ -48,14 +49,15 @@ async function loadApplication() {
 export function Workspace({ me, facility, onSignOut, settings, demoEnabled = false }: { me: Me; facility: string; onSignOut: () => void; settings?: OidcSettings; demoEnabled?: boolean }) {
   const [current, setCurrent] = useState("queue");
   const [emergencySubject,setEmergencySubject] = useState<string|null>(null);
+  const [costContext,setCostContext] = useState<{admissionId:string;noteId:string}|null>(null);
   const [rxContext,setRxContext] = useState<{admissionId:string;noteId:string}|null>(null);
   const [examId, setExamId] = useState<string | null>(null);
   const page = pages.find(item => item.id === current)!;
-  return <AppShell product="Hospital" nav={nav} current={current} onNavigate={id => { setExamId(null); setEmergencySubject(null); setRxContext(null); setCurrent(id); }}
+  return <AppShell product="Hospital" nav={nav} current={current} onNavigate={id => { setExamId(null); setEmergencySubject(null); setRxContext(null); setCostContext(null); setCurrent(id); }}
     unit={{ name: facility }} user={{ name: me.displayName, role: "Bác sĩ", unit: facility }} onSignOut={onSignOut}
     status={<Badge>Demo · dữ liệu giả lập</Badge>}>
-    <PageHeader title={page.label} description={page.description} badges={["intake", "queue", "exam", "prescriptions", "emergency"].includes(current) ? <Badge>Dùng dịch vụ Junctura</Badge> : <Badge>Chưa triển khai</Badge>} />
-    {current === "queue" && settings ? <HospitalQueue settings={settings} onIntake={() => setCurrent("intake")} onExamine={id => { setExamId(id); setCurrent("exam"); }} /> : current === "intake" && settings ? <Intake settings={settings} demoEnabled={demoEnabled} onShowQueue={() => setCurrent("queue")} /> : current === "exam" && settings ? <Examination settings={settings} initialId={examId} onQueue={() => setCurrent("queue")} onEmergency={subject => {setEmergencySubject(subject);setCurrent("emergency");}} onPrescribe={(admissionId,noteId) => {setRxContext({admissionId,noteId});setCurrent("prescriptions");}} /> : current === "prescriptions" && settings ? <Prescriptions settings={settings} initial={rxContext} onExam={() => setCurrent("exam")} /> : current === "emergency" && settings ? <Emergency settings={settings} initialSubject={emergencySubject} demoEnabled={demoEnabled} /> : <EmptyState title="Chức năng đang được xây dựng">
+    <PageHeader title={page.label} description={page.description} badges={["intake", "queue", "exam", "prescriptions", "emergency", "costs"].includes(current) ? <Badge>Dùng dịch vụ Junctura</Badge> : <Badge>Chưa triển khai</Badge>} />
+    {current === "queue" && settings ? <HospitalQueue settings={settings} onIntake={() => setCurrent("intake")} onExamine={id => { setExamId(id); setCurrent("exam"); }} /> : current === "intake" && settings ? <Intake settings={settings} demoEnabled={demoEnabled} onShowQueue={() => setCurrent("queue")} /> : current === "exam" && settings ? <Examination onCosts={(admissionId,noteId)=>{setCostContext({admissionId,noteId});setCurrent("costs");}} settings={settings} initialId={examId} onQueue={() => setCurrent("queue")} onEmergency={subject => {setEmergencySubject(subject);setCurrent("emergency");}} onPrescribe={(admissionId,noteId) => {setRxContext({admissionId,noteId});setCurrent("prescriptions");}} /> : current === "prescriptions" && settings ? <Prescriptions settings={settings} initial={rxContext} onExam={() => setCurrent("exam")} /> : current === "costs" && settings ? <Costs settings={settings} initial={costContext} onExam={()=>setCurrent("exam")} /> : current === "emergency" && settings ? <Emergency settings={settings} initialSubject={emergencySubject} demoEnabled={demoEnabled} /> : <EmptyState title="Chức năng đang được xây dựng">
       Khu vực này chưa xử lý hồ sơ người bệnh. Vui lòng dùng phiên bản đã được đơn vị xác nhận khi tính năng hoàn tất.
     </EmptyState>}
   </AppShell>;

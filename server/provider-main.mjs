@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Junctura Contributors
 // SPDX-License-Identifier: Apache-2.0
+import { createCosts } from "./costs.mjs";
 import { createJuncturaClient } from "@junctura/server-client";
 import { loadConfig } from "./config.mjs";
 import {
@@ -16,7 +17,7 @@ try {
     junctura: sdk,
     catalog: await loadPrescriptionCatalog(c.healthDir),
   });
-  const server = startPrescriptionProvider(c, sdk, service);
+  const server = startPrescriptionProvider(c, sdk, service, createCosts({junctura:sdk}));
   server.on("error", () => {
     console.error("Hospital provider failed to listen");
     process.exitCode = 1;

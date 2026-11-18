@@ -95,3 +95,11 @@ export const requestEmergency=(s:OidcSettings,input:EmergencyInput,signal?:Abort
 export const endEmergency=(s:OidcSettings,operationId:string)=>hospitalRequest<{ended:boolean}>(s,"/api/emergency/end",{operationId});
 export const emergencyHistory=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<EmergencyHistoryResult>(s,"/api/emergency/history",undefined,signal);
 export const getEmergencyDemo=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<{patientSubject:string;label:string}>(s,"/api/emergency/demo",undefined,signal);
+
+export interface CostItem {description:string;quantity:number;unitPriceVnd:number}
+export interface CostInput {admissionId:string;noteId:string;requestId:string;items:CostItem[];confirmed:true}
+export interface CostRecord extends Omit<CostInput,"confirmed"> {id:string;createdAt:string;patientSubject:string;patientName:string;birthYear:number|null;sex:string;claimId:string;amountVnd:number;insuranceStatus:"not-reported";createdBy:{subject:string;displayName:string}}
+export interface CostWorkspace extends ExaminationResult {costs:CostRecord[]}
+export const listCosts=(s:OidcSettings,signal?:AbortSignal)=>hospitalRequest<{items:CostRecord[];atCapacity:boolean}>(s,"/api/costs",undefined,signal);
+export const openCosts=(s:OidcSettings,admissionId:string,signal?:AbortSignal)=>hospitalRequest<CostWorkspace>(s,"/api/costs/open",{admissionId},signal);
+export const createCost=(s:OidcSettings,input:CostInput,signal?:AbortSignal)=>hospitalRequest<{cost:CostRecord;created:boolean}>(s,"/api/costs/create",input,signal);

@@ -13,6 +13,7 @@ services:
       JUNCTURA_URL: http://127.0.0.1:8080
       JUNCTURA_HEALTH_DIR: /health
       JUNCTURA_PHARMACY_APP_ID: ${JUNCTURA_PHARMACY_APP_ID:?Use npm run demo:provider:up}
+      JUNCTURA_INSURANCE_APP_ID: ${JUNCTURA_INSURANCE_APP_ID:?Use npm run demo:provider:up}
       PROVIDER_TLS_CERT: /pki/hospital.provider.internal.crt
       PROVIDER_TLS_KEY: /pki/hospital.provider.internal.key
       PROVIDER_BIND: 0.0.0.0

@@ -19,13 +19,14 @@ try {
   const cases = demoCases(config.healthDir, subjects);
   const stack = await connectDemoStack({ tenant: "tenant-a", base: config.junctura.baseUrl });
   const anToken = await stack.login(cases[0].username, password);
+  const insurance=process.argv.includes("--insurance");
   const prescribing = process.argv.includes("--prescribing"), pharmacy = process.argv.includes("--pharmacy");
   const treatment = process.argv.includes("--treatment") || prescribing;
-  const slug = pharmacy ? "prescription-verify" : prescribing ? "allergy-list" : treatment ? "pre-visit-summary" : "referral-summary";
-  const purpose = pharmacy ? "dispensing" : treatment ? "treatment" : "referral_intake";
-  const consumerAppId = pharmacy ? config.pharmacyAppId : hospital.JUNCTURA_APP_ID;
+  const slug = insurance ? "claim-verify" : pharmacy ? "prescription-verify" : prescribing ? "allergy-list" : treatment ? "pre-visit-summary" : "referral-summary";
+  const purpose = insurance ? "claim_review" : pharmacy ? "dispensing" : treatment ? "treatment" : "referral_intake";
+  const consumerAppId = insurance ? config.insuranceAppId : pharmacy ? config.pharmacyAppId : hospital.JUNCTURA_APP_ID;
   if (!consumerAppId) throw new Error("Missing demo consumer app ID");
-  const statePath = resolve(root, pharmacy ? ".junctura/pharmacy-demo-consent.json" : prescribing ? ".junctura/prescribing-demo-consent.json" : treatment ? ".junctura/exam-demo-consent.json" : ".junctura/referral-demo-consent.json");
+  const statePath = resolve(root, insurance ? ".junctura/insurance-demo-consent.json" : pharmacy ? ".junctura/pharmacy-demo-consent.json" : prescribing ? ".junctura/prescribing-demo-consent.json" : treatment ? ".junctura/exam-demo-consent.json" : ".junctura/referral-demo-consent.json");
   const owned = existsSync(statePath) ? JSON.parse(readFileSync(statePath, "utf8")) : null;
   if (process.argv.includes("--clear")) {
     if (!owned?.consentId) throw new Error("No consent owned by this helper; existing patient consent is unchanged.");
@@ -33,7 +34,7 @@ try {
     if (response.status !== 200) throw new Error("Could not revoke this helper's demo consent.");
     console.log("Revoked this helper's consent only. Other consent was left unchanged.");
   } else {
-    const capabilityId = `urn:junctura:capability:${pharmacy ? config.appId : config.referralProviderAppId}:${slug}`;
+    const capabilityId = `urn:junctura:capability:${(pharmacy || insurance) ? config.appId : config.referralProviderAppId}:${slug}`;
     const active = value => value.consumer?.appId === consumerAppId && value.capabilityId === capabilityId && value.state === "active" && value.purposes.includes(purpose);
     const deniedToken = await stack.login(cases[1].username, password);
     const deniedResponse = await stack.api("/v1/me/consents", deniedToken);
@@ -50,6 +51,6 @@ try {
     }
     console.log(`Demo ready: An can share ${slug} for ${purpose} for 24 hours (or uses existing active consent); the second patient has no matching consent.`);
     for (const item of cases) console.log(`${item.label}: ${item.patientSubject} / ${item.referralId}`);
-    console.log(prescribing ? "Open a saved examination note > Ke don. Allergy-list consent is separate from pre-visit-summary." : pharmacy ? "Pharmacy demo can verify An prescriptions through Core for dispensing." : treatment ? "Open Hospital > Kham and choose An from the called admissions. Treatment consent is separate from referral consent." : "Start with npm run demo:start, open Tiep nhan, and select a demo case. No patient password or token is printed.");
+    console.log(insurance ? "Insurance demo can verify An cost codes and amounts through Core for claim_review." : prescribing ? "Open a saved examination note > Ke don. Allergy-list consent is separate from pre-visit-summary." : pharmacy ? "Pharmacy demo can verify An prescriptions through Core for dispensing." : treatment ? "Open Hospital > Kham and choose An from the called admissions. Treatment consent is separate from referral consent." : "Start with npm run demo:start, open Tiep nhan, and select a demo case. No patient password or token is printed.");
   }
 } catch (error) { console.error(error.status ? "Local Core rejected the demo operation." : error.message); process.exitCode = 1; }

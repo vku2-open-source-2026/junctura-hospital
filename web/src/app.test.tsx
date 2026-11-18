@@ -21,8 +21,8 @@ it("uses the common landing and clearly labels the bootstrap scope", () => {
 it("navigates the shared workspace without claiming patient modules are ready", () => {
   render(<DisplayPrefsProvider><Workspace me={{ subject: "doctor", username: "doctor", displayName: "Bác sĩ thử nghiệm", role: "physician", permissions: ["workspace.read"] }} facility="Bệnh viện thử nghiệm" onSignOut={vi.fn()} /></DisplayPrefsProvider>);
   expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Hàng đợi");
-  fireEvent.click(screen.getByRole("button", { name: "Chi phí" }));
-  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Chi phí");
+  fireEvent.click(screen.getByRole("button", { name: "Nhật ký" }));
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Nhật ký");
   expect(screen.getByText("Chức năng đang được xây dựng")).toBeTruthy();
   expect(screen.queryByRole("button", { name: /Tạo hồ sơ|Kê đơn/ })).toBeNull();
 });

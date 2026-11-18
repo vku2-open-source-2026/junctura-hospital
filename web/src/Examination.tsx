@@ -75,13 +75,14 @@ export function ExaminationFailure({ error }: { error: unknown }) {
 export function Examination({
   settings,
   initialId,
-  onQueue, onPrescribe, onEmergency,
+  onQueue, onPrescribe, onEmergency, onCosts,
 }: {
   settings: OidcSettings;
   initialId?: string | null;
   onQueue: () => void;
   onEmergency?: (subject:string)=>void;
   onPrescribe?: (admissionId:string,noteId:string) => void;
+  onCosts?: (admissionId:string,noteId:string) => void;
 }) {
   const [selected, setSelected] = useState<string | null>(initialId ?? null);
   const [items, setItems] = useState<Admission[] | null>(null);
@@ -108,7 +109,7 @@ export function Examination({
         settings={settings}
         admissionId={selected}
         onEmergency={onEmergency}
-        onPrescribe={onPrescribe}
+        onPrescribe={onPrescribe} onCosts={onCosts}
         onBack={() => {
           setSelected(null);
           setRefresh((value) => value + 1);
@@ -160,13 +161,14 @@ export function Examination({
 function ExamPatient({
   settings,
   admissionId,
-  onBack, onPrescribe, onEmergency,
+  onBack, onPrescribe, onEmergency, onCosts,
 }: {
   settings: OidcSettings;
   admissionId: string;
   onBack: () => void;
   onEmergency?: (subject:string)=>void;
   onPrescribe?: (admissionId:string,noteId:string) => void;
+  onCosts?: (admissionId:string,noteId:string) => void;
 }) {
   const [value, setValue] = useState<ExaminationResult | null>(null);
   const [error, setError] = useState<unknown>(null);
@@ -339,7 +341,7 @@ function ExamPatient({
                           <dd>{text}</dd>
                         </div>
                       ))}
-                    </dl>{onPrescribe && <Button variant="secondary" onClick={() => onPrescribe(admissionId,note.id)}>Kê đơn từ ghi nhận này</Button>}</>
+                    </dl>{onPrescribe && <Button variant="secondary" onClick={() => onPrescribe(admissionId,note.id)}>Kê đơn từ ghi nhận này</Button>}{onCosts && <Button variant="secondary" onClick={()=>onCosts(admissionId,note.id)}>Lập chi phí từ ghi nhận này</Button>}</>
                   ),
                 }))}
               />
