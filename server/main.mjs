@@ -1,8 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Junctura Contributors
 // SPDX-License-Identifier: Apache-2.0
 import { createJuncturaClient } from "@junctura/server-client";
+import { createCosts } from "./costs.mjs";
+import { createEmergency } from "./emergency.mjs";
+import { createPrescriptions, loadPrescriptionCatalog } from "./prescriptions.mjs";
+import { startPrescriptionProvider } from "./prescription-provider.mjs";
+import { createExaminations } from "./examinations.mjs";
+import { createPrevisitLookup, createAllergyLookup } from "./previsit.mjs";
 import { createAdmissions } from "./admissions.mjs";
-import { demoCases } from "./demo.mjs";
+import { demoCases, emergencyDemo } from "./demo.mjs";
 import { readFileSync, existsSync } from "node:fs";
 import { createReferralLookup } from "./referrals.mjs";
 import { createServer } from "node:http";
@@ -27,8 +33,15 @@ try {
   const junctura = config.junctura ? createJuncturaClient({ ...config.junctura, timeoutMs: 5000 }) : null;
   const lookupReferral = createReferralLookup({ junctura, providerAppId: config.referralProviderAppId });
   const admissions = createAdmissions({ junctura, appId: config.appId, facility: config.facility, lookupReferral });
-  const server = createServer(createApp({ config, staff, verifier, lookupReferral, admissions, examples }));
+  const examinations = createExaminations({ junctura, admissions, lookupSummary: createPrevisitLookup({ junctura, providerAppId: config.referralProviderAppId }) });
+  const prescriptions = createPrescriptions({ junctura, examinations, catalog: await loadPrescriptionCatalog(config.healthDir), lookupAllergies: createAllergyLookup({ junctura, providerAppId: config.referralProviderAppId }) });
+  const emergency = createEmergency({junctura,appId:config.appId,providerAppId:config.referralProviderAppId,lookups:{"pre-visit-summary":createPrevisitLookup({junctura,providerAppId:config.referralProviderAppId}),"allergy-list":createAllergyLookup({junctura,providerAppId:config.referralProviderAppId})}});
+  const emergencyExample = config.demoEnabled ? emergencyDemo(config.healthDir,subjects) : undefined;
+  const costs = createCosts({junctura,examinations});
+  const provider = startPrescriptionProvider(config, junctura, prescriptions, costs);
+  provider?.on("error", error => { console.error(`Provider failed (${error.code ?? "provider_error"}).`); server.close(); process.exitCode = 1; });
+  const server = createServer(createApp({ config, staff, verifier, lookupReferral, admissions, examinations, prescriptions, costs, emergency, emergencyExample, examples }));
   server.on("error", error => { console.error(`Hospital could not start (${error.code ?? "server_error"}).`); process.exitCode = 1; });
   server.listen(config.port, config.host, () => console.log(`Junctura Hospital listening on http://${config.host}:${server.address().port}`));
-  for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => server.close(() => process.exit(0)));
+  for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, () => { provider?.close(); server.close(() => process.exit(0)); });
 } catch (error) { console.error(error.message); process.exitCode = 1; }

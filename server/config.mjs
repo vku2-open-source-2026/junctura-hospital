@@ -24,7 +24,15 @@ export function loadConfig({ env = process.env, cwd = process.cwd() } = {}) {
   const clinicEnv = resolve(healthDir, ".junctura/demo/junctura-clinic.env");
   const providerAppId = get("JUNCTURA_REFERRAL_PROVIDER_APP_ID") ??
     (existsSync(clinicEnv) ? parseEnv(readFileSync(clinicEnv, "utf8")).JUNCTURA_APP_ID : undefined);
+  const pharmacyEnv = resolve(healthDir, ".junctura/demo/junctura-pharmacy.env");
+  const pharmacyAppId = get("JUNCTURA_PHARMACY_APP_ID") ?? (existsSync(pharmacyEnv) ? parseEnv(readFileSync(pharmacyEnv, "utf8")).JUNCTURA_APP_ID : undefined);
+  const insuranceEnv = resolve(healthDir, ".junctura/demo/junctura-insurance.env");
+  const insuranceAppId = get("JUNCTURA_INSURANCE_APP_ID") ?? (existsSync(insuranceEnv) ? parseEnv(readFileSync(insuranceEnv,"utf8")).JUNCTURA_APP_ID : undefined);
+  const cert = get("PROVIDER_TLS_CERT"), key = get("PROVIDER_TLS_KEY");
+  const providerPort = Number(get("PROVIDER_PORT") ?? 8443);
+  if (Boolean(cert) !== Boolean(key) || !Number.isInteger(providerPort) || providerPort < 1 || providerPort > 65535) throw new Error("Invalid provider TLS configuration");
   return Object.freeze({
+    pharmacyAppId, insuranceAppId, provider: cert ? Object.freeze({ certFile: resolve(cwd, cert), keyFile: resolve(cwd, key), host: get("PROVIDER_BIND") ?? "127.0.0.1", port: providerPort }) : null,
     junctura: baseUrl && clientId && clientSecret ? Object.freeze({ baseUrl, clientId, clientSecret }) : null,
     referralProviderAppId: providerAppId,
     appId: get("JUNCTURA_APP_ID"), healthDir, demoEnabled: get("HOSPITAL_DEMO") === "true",

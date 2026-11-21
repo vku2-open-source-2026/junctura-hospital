@@ -1,8 +1,34 @@
-<!-- SPDX-FileCopyrightText: 2026 Junctura Contributors -->
+﻿<!-- SPDX-FileCopyrightText: 2026 Junctura Contributors -->
 <!-- SPDX-License-Identifier: Apache-2.0 -->
 # Changelog
 
 ## Unreleased
+
+- Issue #14: lập hồ sơ chi phí từ ghi nhận khám, tính tổng nguyên VND tại backend và lưu Core app-private.
+- Giao diện Health UI có đối chiếu người bệnh, danh sách, khóa/thử lại cùng request và trạng thái chưa có phản hồi bảo hiểm.
+- Provider claim-verify kiểm tra vé Core/caller Insurance/mục đích claim_review, chỉ trả matches/checkedAt.
+- Helper đồng thuận giả lập riêng và test Insurance -> Core -> Hospital TLS; không tạo quyết định hay giao dịch thanh toán.
+
+
+- Issue #12: truy cập cấp cứu pre-visit-summary/allergy-list qua Core, lý do và xác nhận hai bước bằng Health UI.
+- Dải cấp cứu/định danh dính khi cuộn, nguồn/ngày/bốn trạng thái dị ứng; kết thúc/đổi màn bỏ hồ sơ, giới hạn xem 5 phút.
+- Chỉ mục yêu cầu gắn bác sĩ với execution trên Core, idempotency và đối chiếu mất phản hồi; lịch sử không trả nội dung y tế.
+- Giữ quyền hậu kiểm tại Core, xử lý giới hạn 5 lần chờ; không tự cấp quyền, duyệt hoặc xóa review.
+- Ca demo Bình chưa đồng thuận, kiểm thử live chỉ đọc nhật ký dưới danh tính Bình, giữ mục chờ để quản trị viên rà soát.
+
+
+- Issue #10: kê đơn từ ghi nhận khám, gọi allergy-list với treatment và kiểm tra lại trước phát hành.
+- Bốn trạng thái dị ứng, cảnh báo có lý do/xác nhận riêng, bỏ kết quả khi đổi nội dung đơn; không tự điền liều/cách dùng.
+- Lưu đơn trên Core với request ID, mã đơn, hạn và bác sĩ; đối chiếu mất phản hồi và danh sách đơn đã kê.
+- Provider prescription-verify qua SDK vé một lần của Core, kiểm tra người bệnh/caller/capability và trả đúng hợp đồng tối thiểu.
+- Compose provider HTTPS local không mở host port, helper consent giả lập và kiểm thử live từ Pharmacy qua Core.
+
+
+- Issue #8: mở người bệnh đã được gọi vào khám, xem tóm tắt trước khám qua Core với mục đích điều trị.
+- Hiển thị nguồn/ngày và bốn trạng thái dị ứng, nêu dị ứng nặng, đối chiếu định danh hai cơ sở; không thêm giờ cho ngày khám từ trạm.
+- Ghi nhận khám do bác sĩ nhập lưu thành từng bản trên Core; nhận diện thao tác gửi lại và đối chiếu khi mất phản hồi.
+- Helper demo chuẩn bị/thu hồi riêng quyền điều trị cho An; kiểm thử adapter, API, quyền, lưu ghi nhận và giao diện.
+
 
 - Issue #6: xác nhận đúng người bệnh, kiểm tra lại quyền xem phiếu và lưu lượt tiếp nhận vào Core.
 - Hàng đợi đọc trạng thái BPMN của Core, gọi vào khám, nhận diện lượt đã có và đối chiếu khi mất phản hồi.

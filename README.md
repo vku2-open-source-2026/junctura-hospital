@@ -4,7 +4,7 @@
 
 Ứng dụng bệnh viện thuộc [Junctura Health](https://github.com/vku2-open-source-2026/junctura-health), dùng dịch vụ lõi [Junctura DX-OS](https://github.com/vku2-open-source-2026/junctura-dxos).
 
-**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có thao tác gọi vào khám; chưa triển khai khám, kê đơn, cấp cứu hoặc xác minh chi phí. Chỉ dùng dữ liệu giả lập.
+**Trạng thái:** demo. Đã có đăng nhập, phân quyền bác sĩ, tra cứu phiếu chuyển tuyến và xác nhận tiếp nhận vào hàng đợi qua dữ liệu/BPMN của Core (Issue #4, #6). Có gọi vào khám, xem tóm tắt trước khám và lưu ghi nhận khám (Issue #8); có kê đơn với kiểm tra dị ứng và provider xác minh đơn (Issue #10); có truy cập dữ liệu cấp cứu có lý do/hậu kiểm Core (Issue #12); chưa có xác minh chi phí. Chỉ dùng dữ liệu giả lập.
 
 ## Yêu cầu
 
@@ -66,7 +66,7 @@ Biến môi trường ưu tiên hơn file env của Health. `.env` tại Hospita
 - POST /api/admissions/{id}/call: body `{}`, gọi vào khám bằng hoàn tất bước chờ của BPMN.
 - GET /api/demo/referrals: mẫu giả lập, chỉ bật trong demo và sau xác thực bác sĩ.
 
-Các API nghiệp vụ yêu cầu Bearer token physician, JSON POST tối đa 4 KiB và không nhận định danh qua query. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
+Các API nghiệp vụ yêu cầu Bearer token physician và không nhận định danh qua query. JSON POST giới hạn 4 KiB; riêng API khám giới hạn 16 KiB, API kê đơn 32 KiB. Core quản lý lưu dữ liệu, workflow, đồng thuận và audit; Hospital không thêm database hoặc engine riêng.
 
 ## Tra cứu chuyển tuyến
 
@@ -124,9 +124,134 @@ Dừng tiến trình Hospital cũ nếu cổng 5182 đang dùng. Mở **http://l
 
 `npm start` mặc định không có nút mẫu. `npm run demo:start` hoặc `HOSPITAL_DEMO=true` bật mẫu giả lập; bấm mẫu chỉ điền biểu mẫu, không cấp quyền. SDK client/secret và file trạng thái helper luôn nằm ở backend/thư mục bị gitignore. `JUNCTURA_DXOS_DIR` cho phép chỉ rõ vị trí Core cho các helper vận hành.
 
+## Khám và ghi nhận tại bệnh viện (Issue #8)
+
+Từ **Hàng đợi → Đã gọi vào khám → Mở khám**, hoặc tab **Khám** chọn người bệnh. Backend đọc lại lượt từ Core và chỉ cho mở/lưu khi workflow ở trạng thái đã gọi. Trình duyệt chỉ gửi mã lượt; mã người bệnh dùng để gọi Clinic do server lấy từ bản ghi Hospital, không nhận từ client.
+
+Bấm **Tải tóm tắt trước khám** để gọi `pre-visit-summary` đúng phiên bản/digest Health qua Core, input `{}`, context `{ purpose: "treatment", dataSubject }`. Không tự tải khi mở lượt. Hiển thị tên nguồn, ngày cập nhật, bệnh mạn tính, thuốc đang dùng, tối đa ba lần khám và bốn trạng thái dị ứng; dị ứng nặng được nêu riêng. Ngày khám từ trạm chỉ có ngày thì không tự thêm giờ. Định danh từ trạm khác thông tin Hospital đã đối chiếu sẽ có cảnh báo, không tự thay thế định danh Hospital.
+
+Đồng thuận xem phiếu `referral_intake` **không** thay cho đồng thuận điều trị. Thiếu quyền hiện trạng thái riêng; không biến dữ liệu bị chặn thành “không có dị ứng”. Tải lại xóa snapshot cũ trước khi gọi; đổi người bệnh xóa ngữ cảnh và bỏ phản hồi muộn. Dữ liệu đã nhận là snapshot tại lần tải, không phải cơ chế theo dõi thay đổi đồng thuận nền. Không lưu snapshot Clinic vào Core, localStorage hoặc sessionStorage; dữ liệu hiển thị chỉ ở bộ nhớ màn hình.
+
+**Ghi khám tại bệnh viện** gồm lý do, khám/ghi nhận, mã ICD-10 nếu đã đối chiếu, chẩn đoán/nhận định do bác sĩ nhập và xử trí/kế hoạch. Không tự đề xuất chẩn đoán hay thuốc; chưa có danh mục ICD-10 tra cứu. Bác sĩ xác nhận đã kiểm tra trước khi lưu. Dữ liệu lưu vào Core app-private collection `hospital_exam_notes_v1`, giữ subject/người ghi/thời điểm Core tạo. Mỗi bản đã lưu giữ nguyên; bổ sung bằng bản mới, chưa có chức năng sửa/xóa ghi nhận. Có thể ghi khám tại chỗ khi chưa xem được hồ sơ trạm; đó không phải đường vượt quyền xem dữ liệu trạm.
+
+Lưu dùng request UUID cố định cho một lần thao tác. Mất phản hồi thì giữ nội dung, khóa ô nhập và cho **Kiểm tra kết quả lưu** hoặc thử lại cùng nội dung/mã. Không tự đổi mã để ghi lại. Bản nhập chưa lưu chỉ nằm trong bộ nhớ màn hình và mất khi chuyển màn/tải lại; không có tự lưu nháp. Sau tải lại, kiểm tra lịch sử trước khi nhập lại nếu kết quả lần lưu trước chưa rõ.
+
+Giới hạn demo: một writer Hospital, tối đa 100 ghi nhận cho toàn ứng dụng; chỉ đọc collection trong giới hạn và chặn ghi mới khi đầy. Không cam kết exactly-once giữa nhiều replica hoặc request bị treo ở Core; bản cùng request được đối chiếu/gộp khi đọc. Không có ghi đè bản cũ. Ghi nhận khám chưa đổi hàng đợi thành “đã khám xong”, chưa kết thúc đợt điều trị hoặc kê đơn.
+
+### Thử phần Khám với An
+
+Sau khi Core, provider Clinic và Hospital hoạt động, An đã được tiếp nhận/gọi vào khám:
+
+1. Vào **Khám → Mở khám → Tải tóm tắt trước khám**. Nếu An chỉ có quyền xem phiếu, thấy **Chưa có đồng thuận điều trị**.
+2. Trong terminal Hospital chạy `npm run demo:exam:prepare`. Helper dành cho tài khoản **giả lập** cấp quyền `pre-visit-summary`/`treatment` trong 24 giờ (hoặc dùng quyền có sẵn); không sửa đồng thuận phiếu chuyển tuyến.
+3. Bấm tải lại tóm tắt: thấy dữ liệu của An và dị ứng Penicillin nặng. Nhập ghi nhận giả lập, đánh dấu xác nhận rồi **Lưu ghi nhận khám**.
+4. Đổi tab hoặc tải lại trang, mở lại An: ghi nhận đã lưu vẫn còn cùng tên bác sĩ và thời điểm. Tóm tắt từ trạm cần bấm tải lại.
+5. `npm run demo:exam:clear` chỉ thu hồi quyền điều trị do helper này tạo; tải lại tóm tắt bị chặn nếu không có quyền điều trị khác. Không thu hồi quyền có sẵn do người dùng cấp.
+
+API mới (POST JSON, physician):
+
+- `/api/examinations/open` — `{ admissionId }`, trả lượt và ghi nhận thuộc lượt đó.
+- `/api/examinations/summary` — `{ admissionId }`, đọc tóm tắt qua Core với mục đích điều trị.
+- `/api/examinations/notes` — `{ admissionId, requestId, reason, findings, diagnosis: { code, name }, plan }`, trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu. Server gắn bác sĩ từ token đã xác minh.
+
+## Kê đơn và xác minh đơn (Issue #10)
+
+Lưu ghi nhận khám trước, rồi chọn **Kê đơn từ ghi nhận này**. Chọn thuốc/hàm lượng từ danh mục chung `HOSPITAL_DRUGS` của Health; tự nhập số lượng và cách dùng, không tự điền liều. Tối đa 20 thuốc không trùng, số lượng 1–1000 theo hợp đồng. Thời hạn đơn trong demo chọn 1–30 ngày; đây là giới hạn sản phẩm demo, không phải quy định về đơn thuốc.
+
+Bấm **Kiểm tra dị ứng và xem lại đơn**: Hospital gọi `allergy-list` qua Core với input `{}` và `purpose: treatment`, dataSubject lấy từ lượt Hospital. Đồng thuận cho `pre-visit-summary` chưa bao gồm `allergy-list`. Thiếu đồng thuận hoặc lỗi nguồn thì không phát hành; không có đường bỏ qua quyền bằng lý do. Dữ liệu chưa ghi nhận hoặc cũ hơn 365 ngày cần bác sĩ rà soát và ghi lý do. Kết quả có nguồn/ngày và giữ đúng bốn trạng thái dị ứng.
+
+Quy tắc demo chỉ so tên thuốc/chất dị ứng và ánh xạ **Penicillin → Amoxicillin**, tham khảo [NHS về Amoxicillin](https://www.nhs.uk/medicines/amoxicillin/who-can-and-cannot-take-amoxicillin/). Đây không phải cơ sở dữ liệu tương tác, tá dược, thương hiệu hoặc toàn bộ phản ứng chéo; không suy ra một thuốc an toàn vì chưa phát hiện khớp. Không chẩn đoán, gợi ý thuốc hoặc tính liều. Khi có xung đột, giao diện hiển thị cảnh báo chặn; để tiếp tục trong demo bác sĩ phải nhập lý do tối thiểu 10 ký tự và xác nhận riêng. Quy tắc chưa được thẩm định lâm sàng; chỉ dùng dữ liệu giả lập.
+
+Đổi thuốc/số lượng/cách dùng/hạn hoặc ghi nhận làm căn cứ sẽ bỏ kết quả kiểm tra cũ. Sau khi xem lại, đánh dấu đã rà soát rồi **Phát hành đơn thuốc**. Backend kiểm tra lại quyền và dị ứng tại thời điểm phát hành, gắn bác sĩ từ token đã xác minh, giữ lý do/các cảnh báo trong bản ghi. Nếu dữ liệu thay đổi, server có thể yêu cầu rà soát lại dù bước xem trước đã qua.
+
+Đơn lưu trong Core app-private collection `hospital_prescriptions_v1`; mã `DT-…` ổn định theo request UUID, có thời điểm lập/hết hạn và căn cứ ghi nhận khám. Bấm lặp cùng thao tác không tạo đơn mới. Mất phản hồi giữ nguyên nội dung/mã, có nút kiểm tra kết quả phát hành hoặc thử lại cùng thao tác. Bản nhập chưa phát hành ở bộ nhớ màn hình; nếu tải lại khi chưa rõ kết quả, kiểm tra danh sách đơn trước khi nhập lại.
+
+Tab **Đơn thuốc** hiển thị đơn đã lưu và hết hạn. Chưa có sửa/hủy, in/QR hoặc đồng bộ phát thuốc. `dispensed` khởi tạo false; nhãn **Chưa ghi nhận phát thuốc** không xác nhận thực tế nhà thuốc chưa phát. Hợp đồng `prescription-verify` chỉ đọc, chưa có hợp đồng gửi kết quả phát thuốc về Hospital. Giới hạn một writer/100 bản ghi như các module demo khác; không cam kết exactly-once nhiều replica. Khi chạm giới hạn, dừng tạo/xác minh để không trả sai vì dữ liệu nằm ngoài trang đầu.
+
+### Thử kê đơn
+
+1. An đã có lượt gọi vào khám và ghi nhận đã lưu. Chạy `npm run demo:rx:prepare` để chuẩn bị riêng quyền allergy-list/treatment 24 giờ cho An giả lập.
+2. Khám → mở An → **Kê đơn từ ghi nhận này**. Chọn Amoxicillin và nhập nội dung kiểm thử, bấm kiểm tra: thấy cảnh báo Penicillin nặng, nút phát hành vẫn khóa nếu thiếu lý do/xác nhận.
+3. Có thể đổi thuốc trong danh mục để kiểm tra việc bỏ kết quả cũ; đây chỉ là thao tác thử phần mềm, không phải gợi ý thay thuốc. Nhập lại kiểm tra, xem lại rồi phát hành đơn giả lập.
+4. Tải lại trang, mở Đơn thuốc: mã và nội dung vẫn còn. `npm run demo:rx:clear` chỉ thu hồi quyền do helper này tạo; không ảnh hưởng quyền tóm tắt hoặc phiếu chuyển tuyến.
+
+### Provider xác minh cho Pharmacy
+
+Runtime provider bật bằng `PROVIDER_TLS_CERT`, `PROVIDER_TLS_KEY`, `PROVIDER_PORT` (8443) và `PROVIDER_BIND` (mặc định loopback). Đọc `JUNCTURA_PHARMACY_APP_ID` hoặc app ID từ env Pharmacy do Health tạo, không đưa credential Pharmacy vào Hospital runtime. Có chế độ chỉ chạy provider: `node server/provider-main.mjs`.
+
+Provider nhận `POST /capabilities/prescription-verify`. Dùng SDK `redeemTicket` của Core cho vé một lần và input digest, sau đó đối chiếu capability/version/digest, ứng dụng provider/caller, invocation và context `dispensing`. Không chấp nhận quyền xem phiếu/tóm tắt hoặc cấp cứu. Chỉ đọc đơn của đúng dataSubject trong vé. Trả đúng `{ output: { valid, issuedAt, expiresAt, items, dispensed } }`; không có tên, chẩn đoán hay ghi khám. Đơn sai người/không tồn tại trả valid=false, items rỗng và mốc ngày placeholder 1970 bắt buộc theo schema; đơn hết hạn không trả danh sách thuốc. Chưa có chức năng đánh dấu phát thuốc.
+
+Để chạy provider local trong mạng Compose của Core, chuẩn bị tại repo DX-OS:
+
+```powershell
+npm run provider:pki -- clinic hospital
+# Giữ origin Clinic và bổ sung Hospital trong .env:
+# C4A_INTERNAL_PROVIDER_ORIGINS=["https://clinic.provider.internal:8443","https://hospital.provider.internal:8443"]
+docker compose -f compose.yaml -f compose.providers.yaml up -d core
+```
+
+Tại Hospital:
+
+```powershell
+npm run demo:provider:up
+npm run demo:pharmacy:prepare
+npm run test:prescriptions:live
+```
+
+Helper Pharmacy chỉ cấp đồng thuận giả lập `prescription-verify/dispensing` cho An trong 24 giờ; `demo:pharmacy:clear` chỉ thu hồi quyền do helper đó tạo. Kiểm thử live cần đã có đơn An chưa hết hạn, không tự kê thêm đơn. Nó dùng client Pharmacy → Core → provider TLS, xác minh đơn có thật và mã không tồn tại, kiểm tra đúng trường hợp đồng. Core vẫn xử lý grant, đồng thuận và audit.
+
+Compose provider local không mở host port, dùng CA riêng có kiểm tra hostname, tách mạng provider/edge, mount mã/node_modules/seed công khai và đúng key Hospital ở chế độ chỉ đọc. Loopback bridge chỉ phục vụ SDK tới Gateway trong mạng demo; không phải cấu hình triển khai production. Core phải có image `junctura-core:local` và mạng edge/providers. Có thể đặt `JUNCTURA_DXOS_DIR`, `JUNCTURA_EDGE_NETWORK`, `JUNCTURA_PROVIDERS_NETWORK` khi khác mặc định. `npm run demo:provider:down` chỉ dừng container provider này, không xóa dữ liệu Core.
+
+API physician mới:
+
+- GET `/api/prescriptions`: danh sách đơn của Hospital.
+- POST `/api/prescriptions/open`: `{ admissionId }`, căn cứ khám, danh mục và đơn của lượt.
+- POST `/api/prescriptions/check`: `{ admissionId, noteId, items, validDays }`, kiểm tra dị ứng hiện tại.
+- POST `/api/prescriptions/issue`: như check, thêm `{ requestId, reviewConfirmed: true, overrideReason }`. Trả 201 khi tạo, 200 khi nhận diện cùng thao tác đã lưu.
+
+## Truy cập dữ liệu cấp cứu (Issue #12)
+
+Tab **Cấp cứu** dành cho bác sĩ Hospital đã xác thực; có thể mở từ màn Khám khi thiếu đồng thuận điều trị. Không cần lượt tiếp nhận hoặc phiếu chuyển tuyến: ca mẫu Bình chưa có phiếu vẫn dùng được. Đây là luồng truy cập dữ liệu khi cấp cứu, chưa phải chức năng quản lý điều trị cấp cứu, phân loại hay vận chuyển người bệnh.
+
+1. Nhập mã người bệnh và chọn **Tóm tắt trước khám** hoặc **Danh sách dị ứng**. Đối chiếu đúng người bệnh và đánh dấu xác nhận.
+2. **Nhập lý do truy cập cấp cứu**: hộp thoại Health UI gồm bước nhập lý do và bước xác nhận lại người bệnh/dữ liệu/lý do. Hủy ở một trong hai bước không tạo tác vụ Core.
+3. Hospital gọi đúng manifest/version/digest của Clinic qua SDK, input `{}`, context `{ purpose: "treatment", dataSubject, emergency: true, justification }`. Lý do 10–500 ký tự, không có ký tự điều khiển. Core cho bỏ kiểm tra đồng thuận trong trường hợp này, vẫn giữ grant/quyền ứng dụng, vé provider, nhật ký và hậu kiểm.
+4. Khi chờ/xem kết quả có dải **Đang truy cập khẩn cấp** kèm lý do và nút kết thúc, giữ cùng thanh định danh khi cuộn. Dữ liệu có nguồn/ngày và bốn trạng thái dị ứng. Riêng allergy-list không cung cấp định danh nên không tự điền họ tên/năm sinh/giới.
+5. **Kết thúc truy cập khẩn cấp** xóa hồ sơ khỏi màn xem và đóng yêu cầu tại Hospital; đổi tab/tải lại cũng bỏ nội dung trong bộ nhớ màn hình. Không xóa sự kiện Core, không thu hồi dữ liệu đã tải, không tự duyệt hậu kiểm. Màn xem tự đóng sau tối đa khoảng 5 phút; backend cũng chặn sử dụng lại yêu cầu quá 5 phút hoặc đã đóng. Không lưu bản sao hồ sơ vào app-private collection, localStorage hoặc sessionStorage.
+
+Chỉ hai năng lực trên được phép. Không dùng cấp cứu để mở `referral-summary`, `prescription-verify`, chi phí hoặc bỏ qua quyền kê đơn. Mỗi lần xác nhận chỉ gọi một năng lực, không âm thầm tạo hai tác vụ cấp cứu. Luồng kê đơn và đọc thông thường tiếp tục yêu cầu đồng thuận như trước.
+
+### Liên kết yêu cầu và lịch sử
+
+Hospital lưu **chỉ mục yêu cầu** trong Core app-private `hospital_emergency_requests_v1`: mã thao tác, mã người bệnh, năng lực, lý do, bác sĩ đã xác minh, thời điểm và mã execution. Không chứa kết quả y tế. Đây là metadata nghiệp vụ để nối lượt yêu cầu của bác sĩ với tác vụ Core; không thay thế nhật ký bảo vệ của Core và không có thuật toán audit/consent/review riêng.
+
+Chỉ mục được ghi trước khi gửi; server liên kết execution ngay sau khi Core nhận. Nếu mất phản hồi, thử lại giữ cùng mã idempotency, người bệnh, lý do và bác sĩ để đối chiếu. Không tự tạo mã mới khi kết quả chưa rõ. Một yêu cầu chưa liên kết không được coi là đã truy cập thành công; Core có thể đã nhận nhưng chưa trả mã về. Yêu cầu hết thời hạn cần xác nhận lại bằng mã mới nếu vẫn có lý do cấp cứu. Giới hạn demo một writer/100 bản ghi; chưa cam kết exactly-once nhiều replica hoặc khôi phục chỉ mục bị xóa ngoài ứng dụng.
+
+**Yêu cầu cấp cứu của Hospital** đọc metadata từ Core Data và trạng thái execution từ Core; không trả nội dung hồ sơ trong lịch sử. API kết quả hậu kiểm `/v1/emergency-accesses` yêu cầu `trust.approve`: với client Hospital thông thường, UI ghi rõ chỉ quản trị viên xem được kết quả, không suy diễn là đã duyệt/chờ duyệt. Nếu client đã có quyền đọc hợp lệ, chỉ hiện kết quả của những mã execution của Hospital trong chỉ mục. App không cấp thêm quyền quản trị và không cung cấp route duyệt.
+
+Core chặn khi có **5 lần truy cập chưa hậu kiểm cho cùng ứng dụng** (`429 emergency_review_backlog`), kể cả có nhiều bác sĩ. Khi chạm giới hạn, liên hệ quản trị viên DX-OS. Đóng màn xem không làm giảm số chờ hậu kiểm. Quản trị viên thực hiện qua API sẵn có:
+
+- GET `/v1/emergency-accesses`
+- POST `/v1/emergency-accesses/{executionId}/review`, `{ decision: "justified" | "unjustified", note }`
+
+Hospital không gọi API ghi quyết định này. Người bệnh xem lần truy cập và trạng thái hậu kiểm qua `/v1/me/data-access` bằng chính tài khoản của mình.
+
+### Thử với Bình giả lập
+
+Core và provider Clinic phải hoạt động; chạy Hospital bằng `npm run demo:start`. Trong **Cấp cứu**, bấm **Bình — thử truy cập cấp cứu**, đối chiếu mã, nhập lý do rõ đây là kiểm thử dữ liệu giả, xác nhận hai bước. Xem kết quả và kết thúc. Nút mẫu chỉ điền mã, không cấp đồng thuận. Không chạy nhiều lần liên tiếp để tránh làm đầy hàng hậu kiểm.
+
+`npm run test:emergency:live` kiểm chứng **yêu cầu Bình đã có** (có thể thêm executionId làm đối số). Script chỉ đọc: dùng client Hospital đọc metadata/trạng thái, đăng nhập Bình giả lập bằng helper PKCE của Core, kiểm tra không có đồng thuận tương ứng và kiểm tra nhật ký của chính Bình có `emergency=true`, `purpose=treatment` cùng trạng thái hậu kiểm. Nó không tạo thêm lần cấp cứu, không thu hồi consent và không duyệt/xóa mục chờ. Lần QA của module được giữ lại để quản trị viên kiểm tra.
+
+API mới (physician, không nhận định danh qua query, JSON POST tối đa 4 KiB):
+
+- GET `/api/emergency/demo`: mã mẫu chỉ trong chế độ demo, sau xác thực.
+- GET `/api/emergency/history`: chỉ mục yêu cầu và trạng thái đối chiếu Core.
+- POST `/api/emergency/access`: `{ operationId, patientSubject, capability, justification, identityConfirmed: true, confirmed: true }`; capability chỉ pre-visit-summary/allergy-list.
+- POST `/api/emergency/end`: `{ operationId }`; chỉ bác sĩ sở hữu yêu cầu được đóng. Không hủy execution hoặc quyết định hậu kiểm Core.
+
 ## Năng lực còn lại
 
-Đã gọi `referral-summary`; các năng lực `pre-visit-summary`, `allergy-list`, `vaccination-history`, `prescription-verify` và `claim-verify` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
+Đã gọi `referral-summary` và `pre-visit-summary`; đã thêm `allergy-list` và provider `prescription-verify`; đã thêm provider `claim-verify`; `vaccination-history` để Issue sau. Hợp đồng lấy từ @junctura/health-contracts.
 
 ## Kiểm thử và giấy phép
 
@@ -142,3 +267,29 @@ npm run check:reuse
 Nếu Python hệ thống chưa có pip, có thể dùng `uv run --no-project --python 3.12 --with-requirements requirements-reuse.txt python -m reuse lint`. Bản build giữ thông báo bản quyền thư viện/font trong `web/dist/notices/`.
 
 Apache-2.0. Khung cấu hình, xác minh token và PKCE tái sử dụng từ Clinic; giao diện dùng @junctura/health-ui. Xem NOTICE, THIRD-PARTY.md và CONTRIBUTING.md.
+
+## Chi phí và xác minh cho bảo hiểm (Issue #14)
+
+Trong **Khám**, mở người bệnh đã được gọi, chọn **Lập chi phí từ ghi nhận này** ở một ghi nhận đã lưu. Nhập 1–20 khoản, mô tả, số lượng nguyên 1–1000 và đơn giá nguyên VND (cho phép 0). Máy chủ tự tính tổng, tối đa 1.000.000.000.000 VND; không nhận tổng tiền hay định danh bác sĩ từ trình duyệt. Đơn giá là dữ liệu nhập cho demo, không phải biểu giá chính thức.
+
+Xác nhận đúng người bệnh và nội dung rồi **Lưu hồ sơ chi phí**. Mỗi hồ sơ có mã `HS-...`, thời gian, người lập, ghi nhận khám gốc và được lưu trong collection riêng `hospital_costs_v1` của ứng dụng trên Core. Tab **Chi phí** đọc lại các hồ sơ. Bản demo chưa có chỉnh sửa/hủy, gửi yêu cầu bảo hiểm, phê duyệt hay thanh toán. Trạng thái **Chưa có phản hồi từ bảo hiểm** phản ánh điều đó; kết quả xác minh không phải quyết định chi trả.
+
+Nếu mất phản hồi khi lưu, nội dung bị khóa và **Thử lại cùng hồ sơ chi phí** gửi cùng request ID. Không thoát màn/tải lại trang hoặc tạo thao tác mới khi chưa rõ kết quả; mã thử lại hiện chỉ giữ trong phiên màn hình. Máy chủ đối chiếu request ID với Core khi mất phản hồi và sau khởi động lại. Demo giới hạn 100 dòng dữ liệu thô và một tiến trình ghi; Core hiện chưa có transaction/CAS nên không bảo đảm exactly-once giữa nhiều replica. Khi đạt giới hạn, việc xác minh trả lỗi, không trả một kết quả không khớp sai lệch.
+
+Provider HTTPS dùng chung `compose.provider-demo.yaml`, không mở cổng host. Endpoint `/capabilities/claim-verify` chỉ đọc sau khi đổi vé một lần bằng SDK Core, kiểm tra caller Insurance, provider, capability/version/digest, invocation, người bệnh và mục đích `claim_review`. Không cho cấp cứu. Core kiểm tra grant/đồng thuận và ghi nhật ký; Hospital không tự cấp quyền. Input đúng hợp đồng Health `{claimId, amountVnd}`; output chỉ `{matches, checkedAt}`. Không trả số tiền đúng, tên người bệnh, dòng chi phí hoặc chẩn đoán. Mã không tồn tại, sai người bệnh hoặc sai số tiền đều trả `matches:false`; lỗi hạ tầng trả lỗi.
+
+Kiểm thử với dữ liệu giả An và Core local đã được Health đăng ký grant:
+
+```powershell
+npm run demo:provider:up
+npm run demo:insurance:prepare
+npm run demo:start
+# Mở http://localhost:5182, lập một hồ sơ chi phí giả cho An.
+npm run test:costs:live
+# Thu hồi riêng đồng thuận do helper này đã tạo khi kết thúc demo:
+npm run demo:insurance:clear
+```
+
+Helper chỉ dùng tài khoản giả An và cấp/kiểm tra đồng thuận claim-verify cho Insurance trong 24 giờ. Test live dùng client Insurance qua Core và provider TLS Hospital, kiểm tra đúng tiền, sai tiền và mã không tồn tại, cùng đúng hai trường output. Nó không tạo hồ sơ bảo hiểm, quyết định hay giao dịch tiền. UI Insurance chưa được triển khai trong module này.
+
+API bác sĩ mới: GET `/api/costs`, POST `/api/costs/open` `{admissionId}`, POST `/api/costs/create` `{admissionId,noteId,requestId,items,confirmed:true}`. POST chỉ nhận JSON tối đa 16 KiB; không nhận mã người bệnh qua query. Backend bắt buộc ghi nhận khám thuộc đúng lượt đã gọi và lấy người bệnh từ hồ sơ trên Core.
